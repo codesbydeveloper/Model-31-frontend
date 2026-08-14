@@ -102,11 +102,6 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleSubmit} className="px-5 py-6 sm:px-7 sm:py-7">
-          <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-muted)] px-3 py-2 text-xs text-[var(--text-muted)]">
-            Frontend demo authentication only. Backend auth will be connected
-            later.
-          </div>
-
           {error && (
             <div
               role="alert"
