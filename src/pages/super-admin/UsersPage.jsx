@@ -44,7 +44,7 @@ export default function UsersPage() {
 
   const dealershipOptions = useMemo(
     () => [
-      'Model 31 Corporate',
+      'AutoFlow Corporate',
       ...initialDealerships.map((d) => d.name),
       'Unassigned',
     ],

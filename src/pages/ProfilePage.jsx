@@ -54,7 +54,7 @@ export default function ProfilePage() {
       <Breadcrumbs />
       <PageHeader
         title="Profile"
-        description="Your account details for this Model 31 demo session."
+        description="Your account details for this AutoFlow demo session."
       />
       <Card>
         <div className="flex items-center gap-4">

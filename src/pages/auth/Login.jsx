@@ -11,7 +11,7 @@ import { getDashboardPathForRole } from '../../data/roles'
 import { APP_NAME, APP_SUBTITLE } from '../../data/navigation'
 import { cn } from '../../utils/cn'
 
-const REMEMBER_EMAIL_KEY = 'model31_remember_email'
+const REMEMBER_EMAIL_KEY = 'autoflow_remember_email'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -91,7 +91,7 @@ export default function Login() {
       <Card className="overflow-hidden p-0">
         <div className="border-b border-[var(--border-default)] bg-[var(--bg-muted)] px-5 py-6 text-center sm:px-7">
           <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--brand-primary)] text-sm font-bold text-white">
-            M31
+            AF
           </div>
           <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-2xl">
             {APP_NAME}

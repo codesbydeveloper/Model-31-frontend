@@ -1,6 +1,6 @@
 export const initialPlatformSettings = {
   general: {
-    platformName: 'Model 31',
+    platformName: 'AutoFlow',
     timezone: 'America/New_York',
     defaultLanguage: 'English',
   },

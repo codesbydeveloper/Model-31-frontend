@@ -92,7 +92,7 @@ export default function CustomerIdentityDetailPage() {
         <Card>
           <h2 className="mb-3 text-base font-semibold">Identifiers</h2>
           <dl className="space-y-2 text-sm">
-            <Row label="Model 31 Customer ID" value={customer.model31Id} />
+            <Row label="AutoFlow Customer ID" value={customer.autoFlowId} />
             <Row label="CRM ID" value={customer.crmId} />
             <Row label="Lead IDs" value={(customer.leadIds || []).join(', ')} />
           </dl>
@@ -207,7 +207,7 @@ function CompareCard({ title, customer }) {
       <p>{customer.name}</p>
       <p className="text-[var(--text-secondary)]">{customer.email}</p>
       <p className="text-[var(--text-secondary)]">{customer.phone}</p>
-      <p className="mt-2 text-xs text-[var(--text-muted)]">{customer.model31Id}</p>
+      <p className="mt-2 text-xs text-[var(--text-muted)]">{customer.autoFlowId}</p>
       <p className="text-xs text-[var(--text-muted)]">{customer.crmId}</p>
     </div>
   )

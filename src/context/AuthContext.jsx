@@ -3,7 +3,7 @@ import { AuthContext } from './auth-context'
 import { mockLogin } from '../services/mock/authService'
 import { getDashboardPathForRole } from '../data/roles'
 
-const STORAGE_KEY = 'model31_user'
+const STORAGE_KEY = 'autoflow_user'
 
 function readStoredUser() {
   try {

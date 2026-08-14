@@ -2,7 +2,7 @@ export const initialSalespeople = [
   {
     id: 'sp_001',
     name: 'John Smith',
-    email: 'salesperson@model31.com',
+    email: 'salesperson@autoflow.com',
     status: 'ONLINE',
     currentLeads: 3,
     dealership: 'Miami Luxury Motors',
@@ -190,4 +190,4 @@ export const salespersonPortalStats = {
   commission: 2450,
 }
 
-export const SP_STATUS_KEY = 'model31_sp_status'
+export const SP_STATUS_KEY = 'autoflow_sp_status'

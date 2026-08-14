@@ -636,7 +636,7 @@ function defaultTimeline(lead) {
     }
   }
 
-  const items = [add(0, 'Lead Created', 'Lead entered Model 31')]
+  const items = [add(0, 'Lead Created', 'Lead entered AutoFlow')]
   if (lead.status !== 'NEW') {
     items.push(add(1, 'Conversation Started', 'AI conversation opened'))
     items.push(add(3, 'Budget Captured', `Budget set to ${lead.budget}`))

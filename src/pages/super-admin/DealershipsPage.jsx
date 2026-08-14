@@ -243,7 +243,7 @@ export default function DealershipsPage() {
       <Breadcrumbs />
       <PageHeader
         title="Dealerships"
-        description="Manage dealerships connected to the Model 31 platform."
+        description="Manage dealerships connected to the AutoFlow platform."
         actions={
           <Button onClick={openCreate}>
             <Plus size={16} />

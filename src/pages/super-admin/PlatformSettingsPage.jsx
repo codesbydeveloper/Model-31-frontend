@@ -55,7 +55,7 @@ export default function PlatformSettingsPage() {
       <Breadcrumbs />
       <PageHeader
         title="Platform Settings"
-        description="Manage global Model 31 platform configuration."
+        description="Manage global AutoFlow platform configuration."
         actions={
           <Button onClick={onSave} disabled={saving}>
             {saving ? (

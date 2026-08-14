@@ -27,7 +27,7 @@ export async function mergeCustomerRecords(primaryId, duplicateId) {
       id: `ct_merge_${Date.now()}`,
       event: 'Records Merged',
       time: 'Just now',
-      detail: `Merged ${duplicate.model31Id} into ${primary.model31Id}`,
+      detail: `Merged ${duplicate.autoFlowId} into ${primary.autoFlowId}`,
     },
     ...(primary.timeline || []),
     ...(duplicate.timeline || []),

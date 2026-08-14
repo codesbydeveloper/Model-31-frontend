@@ -242,7 +242,7 @@ export default function LeadsPage() {
       <Breadcrumbs />
       <PageHeader
         title="Leads"
-        description="Manage, qualify and monitor customer leads across the Model 31 platform."
+        description="Manage, qualify and monitor customer leads across the AutoFlow platform."
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">

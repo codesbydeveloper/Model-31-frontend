@@ -2,9 +2,9 @@ export const initialPlatformUsers = [
   {
     id: 'pu_001',
     name: 'Alex Rivera',
-    email: 'superadmin@model31.com',
+    email: 'superadmin@autoflow.com',
     role: 'Super Admin',
-    dealership: 'Model 31 Corporate',
+    dealership: 'AutoFlow Corporate',
     phone: '(800) 555-0100',
     status: 'Active',
     lastActive: '2026-03-14 09:12',
@@ -13,7 +13,7 @@ export const initialPlatformUsers = [
   {
     id: 'pu_002',
     name: 'Jordan Blake',
-    email: 'dealeradmin@model31.com',
+    email: 'dealeradmin@autoflow.com',
     role: 'Dealership Admin',
     dealership: 'Miami Luxury Motors',
     phone: '(305) 555-0142',
@@ -24,7 +24,7 @@ export const initialPlatformUsers = [
   {
     id: 'pu_003',
     name: 'Casey Morgan',
-    email: 'bdcmanager@model31.com',
+    email: 'bdcmanager@autoflow.com',
     role: 'BDC Manager',
     dealership: 'Chicago Auto Group',
     phone: '(312) 555-0198',
@@ -35,7 +35,7 @@ export const initialPlatformUsers = [
   {
     id: 'pu_004',
     name: 'John Smith',
-    email: 'salesperson@model31.com',
+    email: 'salesperson@autoflow.com',
     role: 'Salesperson',
     dealership: 'Dallas Premium Motors',
     phone: '(214) 555-0176',
@@ -46,7 +46,7 @@ export const initialPlatformUsers = [
   {
     id: 'pu_005',
     name: 'Taylor Quinn',
-    email: 'marketing@model31.com',
+    email: 'marketing@autoflow.com',
     role: 'Marketing Manager',
     dealership: 'Los Angeles Auto Center',
     phone: '(323) 555-0111',

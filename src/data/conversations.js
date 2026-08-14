@@ -60,7 +60,7 @@ function genericConversation(leadId, vehicle) {
     {
       id: `msg_${leadId}_2`,
       sender: 'ai',
-      text: "Welcome to Model 31. I'd be glad to help. What's your preferred monthly budget?",
+      text: "Welcome to AutoFlow. I'd be glad to help. What's your preferred monthly budget?",
       timestamp: '9:15 AM',
     },
     {

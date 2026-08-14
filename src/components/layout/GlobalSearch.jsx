@@ -58,7 +58,7 @@ export default function GlobalSearch() {
               type: 'Customer',
               name: c.name,
               status: c.status,
-              id: c.model31Id,
+              id: c.autoFlowId,
               path:
                 user?.role === ROLES.SUPER_ADMIN
                   ? `/super-admin/customer-identity/${c.id}`

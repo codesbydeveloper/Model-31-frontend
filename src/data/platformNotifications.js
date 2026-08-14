@@ -23,7 +23,7 @@ export const initialPlatformNotifications = [
     id: 'pn_003',
     category: 'Integration Errors',
     title: 'X account disconnected',
-    description: 'OAuth token expired for @Model31Auto.',
+    description: 'OAuth token expired for @AutoFlowAuto.',
     severity: 'WARNING',
     date: '2026-08-13 18:40',
     read: false,

@@ -242,7 +242,7 @@ export default function CrmIntegrationDetailPage() {
         <Card>
           <DataTable
             columns={[
-              { key: 'source', label: 'Model 31 Field' },
+              { key: 'source', label: 'AutoFlow Field' },
               { key: 'target', label: 'CRM Field' },
               {
                 key: 'status',

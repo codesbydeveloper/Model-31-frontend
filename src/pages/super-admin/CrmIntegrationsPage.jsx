@@ -73,7 +73,7 @@ export default function CrmIntegrationsPage() {
       <Breadcrumbs />
       <PageHeader
         title="CRM Integrations"
-        description="Manage CRM connections, synchronization and integration health across the Model 31 platform."
+        description="Manage CRM connections, synchronization and integration health across the AutoFlow platform."
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">

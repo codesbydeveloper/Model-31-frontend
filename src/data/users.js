@@ -6,17 +6,17 @@ export const users = [
   {
     id: 'usr_super_admin',
     name: 'Alex Rivera',
-    email: 'superadmin@model31.com',
+    email: 'superadmin@autoflow.com',
     password: DEMO_PASSWORD,
     role: ROLES.SUPER_ADMIN,
     avatar: 'AR',
     status: 'active',
-    dealership: 'Model 31 Corporate',
+    dealership: 'AutoFlow Corporate',
   },
   {
     id: 'usr_dealer_admin',
     name: 'Jordan Blake',
-    email: 'dealeradmin@model31.com',
+    email: 'dealeradmin@autoflow.com',
     password: DEMO_PASSWORD,
     role: ROLES.DEALERSHIP_ADMIN,
     avatar: 'JB',
@@ -26,7 +26,7 @@ export const users = [
   {
     id: 'usr_bdc_manager',
     name: 'Casey Morgan',
-    email: 'bdcmanager@model31.com',
+    email: 'bdcmanager@autoflow.com',
     password: DEMO_PASSWORD,
     role: ROLES.BDC_MANAGER,
     avatar: 'CM',
@@ -36,7 +36,7 @@ export const users = [
   {
     id: 'usr_salesperson',
     name: 'John Smith',
-    email: 'salesperson@model31.com',
+    email: 'salesperson@autoflow.com',
     password: DEMO_PASSWORD,
     role: ROLES.SALESPERSON,
     avatar: 'JS',
@@ -47,7 +47,7 @@ export const users = [
   {
     id: 'usr_marketing',
     name: 'Taylor Quinn',
-    email: 'marketing@model31.com',
+    email: 'marketing@autoflow.com',
     password: DEMO_PASSWORD,
     role: ROLES.MARKETING_MANAGER,
     avatar: 'TQ',

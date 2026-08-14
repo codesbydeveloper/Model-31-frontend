@@ -41,11 +41,11 @@ import {
 import { ROLES } from '../data/roles'
 
 /**
- * Centralized role-based navigation for Model 31.
+ * Centralized role-based navigation for AutoFlow.
  * Placeholder routes only — business modules come in later steps.
  */
 
-export const SIDEBAR_COLLAPSED_KEY = 'model31_sidebar_collapsed'
+export const SIDEBAR_COLLAPSED_KEY = 'autoflow_sidebar_collapsed'
 
 export const FOOTER_NAV = [
   { label: 'Profile', path: '/profile', icon: UserRound },
@@ -69,7 +69,7 @@ export const ROLE_NAVIGATION = {
       icon: Building2,
       title: 'Dealerships',
       subtitle: 'Dealership Management',
-      description: 'Manage dealerships across the Model 31 platform.',
+      description: 'Manage dealerships across the AutoFlow platform.',
     },
     {
       label: 'Leads',
@@ -78,7 +78,7 @@ export const ROLE_NAVIGATION = {
       title: 'Leads',
       subtitle: 'Lead Management',
       description:
-        'Manage, qualify and monitor customer leads across the Model 31 platform.',
+        'Manage, qualify and monitor customer leads across the AutoFlow platform.',
     },
     {
       label: 'Cities',
@@ -126,9 +126,9 @@ export const ROLE_NAVIGATION = {
       icon: Cable,
       title: 'CRM Integrations',
       subtitle:
-        'Manage CRM connections, synchronization and integration health across the Model 31 platform.',
+        'Manage CRM connections, synchronization and integration health across the AutoFlow platform.',
       description:
-        'Manage CRM connections, synchronization and integration health across the Model 31 platform.',
+        'Manage CRM connections, synchronization and integration health across the AutoFlow platform.',
     },
     {
       label: 'Customer Identity',
@@ -208,7 +208,7 @@ export const ROLE_NAVIGATION = {
       icon: Settings,
       title: 'Platform Settings',
       subtitle: 'Platform Configuration',
-      description: 'Manage global Model 31 platform settings.',
+      description: 'Manage global AutoFlow platform settings.',
       isSettings: true,
     },
   ],
@@ -549,7 +549,7 @@ export function getPageTitle(pathname, role) {
   if (pathname === '/profile') return 'Profile'
   if (pathname === '/settings') return 'Settings'
   if (pathname === '/access-denied') return 'Access Restricted'
-  return 'Model 31'
+  return 'AutoFlow'
 }
 
 export function buildBreadcrumbs(pathname, role) {

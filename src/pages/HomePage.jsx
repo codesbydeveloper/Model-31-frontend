@@ -36,7 +36,7 @@ export default function HomePage() {
   return (
     <div className="mx-auto w-full max-w-5xl">
       <PageHeader
-        title="Welcome to Model 31"
+        title="Welcome to AutoFlow"
         description={APP_SUBTITLE}
       />
 

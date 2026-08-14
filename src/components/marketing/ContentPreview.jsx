@@ -26,10 +26,10 @@ export default function ContentPreview({
       >
         <div className="mb-3 flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--brand-accent)] text-xs font-bold text-white">
-            M31
+            AF
           </div>
           <div>
-            <p className="text-sm font-semibold">Model 31 Dealership</p>
+            <p className="text-sm font-semibold">AutoFlow Dealership</p>
             <p
               className={cn(
                 'text-xs',

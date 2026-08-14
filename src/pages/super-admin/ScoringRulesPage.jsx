@@ -206,7 +206,7 @@ export default function ScoringRulesPage() {
         <Card>
           <h2 className="text-base font-semibold">Lead Lifecycle</h2>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Visual lifecycle used across Model 31 lead processing.
+            Visual lifecycle used across AutoFlow lead processing.
           </p>
           <div className="mt-5">
             <FunnelVisual

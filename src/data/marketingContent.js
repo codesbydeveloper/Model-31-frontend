@@ -63,7 +63,7 @@ export const MOCK_GENERATIONS = [
     title: '2026 Lexus RX — Luxury Without Compromise',
     content:
       'Experience the perfect combination of luxury, comfort and technology with the 2026 Lexus RX. Visit our dealership today to explore available options.',
-    hashtags: ['#LexusRX', '#LuxurySUV', '#Model31'],
+    hashtags: ['#LexusRX', '#LuxurySUV', '#AutoFlow'],
   },
   {
     title: 'Drive Home in a 2026 BMW X5 This Weekend',
@@ -87,7 +87,7 @@ export const MOCK_GENERATIONS = [
     title: 'Lease Luxury for Less — Limited Time',
     content:
       'Lock in promotional lease rates on select luxury vehicles. Speak with our team today before this month’s allocations are gone.',
-    hashtags: ['#LeaseDeals', '#LuxuryLease', '#Model31Marketing'],
+    hashtags: ['#LeaseDeals', '#LuxuryLease', '#AutoFlowMarketing'],
   },
 ]
 
@@ -175,7 +175,7 @@ function expandContent() {
       brief: 'Highlight luxury SUV inventory and book a test drive.',
       body:
         'Experience the perfect combination of luxury, comfort and technology. Visit our dealership today to explore available options.',
-      hashtags: ['#LexusRX', '#LuxurySUV', '#Model31'],
+      hashtags: ['#LexusRX', '#LuxurySUV', '#AutoFlow'],
       imagePrompt:
         type === 'Image Prompt'
           ? 'Luxury black SUV parked outside a modern dealership at sunset.'
