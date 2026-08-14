@@ -1,0 +1,1 @@
+export { initialSoldDeals } from './commission'
