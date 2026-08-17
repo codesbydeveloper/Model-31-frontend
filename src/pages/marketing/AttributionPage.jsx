@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
+import StatCard from '../../components/common/StatCard'
+import Select from '../../components/common/Select'
 import DataTable from '../../components/common/DataTable'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import PlatformBadge from '../../components/marketing/PlatformBadge'
+import PipelineBadge from '../../components/common/PipelineBadge'
 import { formatNumber } from '../../utils/table'
 import attributionService from '../../services/mock/attributionService'
 import platformAnalyticsService from '../../services/mock/platformAnalyticsService'
+import { PIPELINE_TYPES } from '../../utils/pipeline'
 
 function pct(part, whole) {
   if (!whole) return '0%'
@@ -19,6 +23,7 @@ export default function AttributionPage() {
   const [rows, setRows] = useState([])
   const [journey, setJourney] = useState([])
   const [loading, setLoading] = useState(true)
+  const [pipeline, setPipeline] = useState('all')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -40,6 +45,11 @@ export default function AttributionPage() {
     return () => window.clearTimeout(t)
   }, [load])
 
+  const filteredRows = useMemo(() => {
+    if (pipeline === 'all') return rows
+    return rows.filter((row) => row.pipeline === pipeline)
+  }, [rows, pipeline])
+
   if (loading || !funnel) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
@@ -57,6 +67,10 @@ export default function AttributionPage() {
     { key: 'sold', label: 'Sold', value: funnel.sold },
   ]
 
+  const sumField = (list, key) => list.reduce((total, row) => total + Number(row[key] || 0), 0)
+  const model31Rows = rows.filter((row) => row.pipeline === PIPELINE_TYPES.MODEL31)
+  const dealershipRows = rows.filter((row) => row.pipeline === PIPELINE_TYPES.DEALERSHIP)
+
   return (
     <div className="mx-auto w-full max-w-7xl">
       <Breadcrumbs />
@@ -64,6 +78,27 @@ export default function AttributionPage() {
         title="Marketing Attribution"
         description="Track how marketing content and campaigns convert into leads, appointments and sales."
       />
+
+      <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <h2 className="mb-3 text-base font-semibold">MODEL 31 Attribution</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Leads" value={formatNumber(sumField(model31Rows, 'leads'))} />
+            <StatCard label="Qualified" value={formatNumber(sumField(model31Rows, 'qualifiedLeads'))} />
+            <StatCard label="Appointments" value={formatNumber(sumField(model31Rows, 'appointments'))} />
+            <StatCard label="Sold" value={formatNumber(sumField(model31Rows, 'soldDeals'))} />
+          </div>
+        </Card>
+        <Card>
+          <h2 className="mb-3 text-base font-semibold">DEALERSHIP Attribution</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Leads" value={formatNumber(sumField(dealershipRows, 'leads'))} />
+            <StatCard label="Qualified" value={formatNumber(sumField(dealershipRows, 'qualifiedLeads'))} />
+            <StatCard label="Appointments" value={formatNumber(sumField(dealershipRows, 'appointments'))} />
+            <StatCard label="Sold" value={formatNumber(sumField(dealershipRows, 'soldDeals'))} />
+          </div>
+        </Card>
+      </div>
 
       <Card className="mb-5">
         <h2 className="mb-4 text-base font-semibold">Attribution Funnel</h2>
@@ -112,10 +147,26 @@ export default function AttributionPage() {
       </Card>
 
       <Card>
-        <h2 className="mb-4 text-base font-semibold">Attribution Breakdown</h2>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-base font-semibold">Attribution Breakdown</h2>
+          <Select
+            value={pipeline}
+            onChange={(e) => setPipeline(e.target.value)}
+            options={[
+              { value: 'all', label: 'All pipelines' },
+              { value: PIPELINE_TYPES.MODEL31, label: 'MODEL 31' },
+              { value: PIPELINE_TYPES.DEALERSHIP, label: 'DEALERSHIP' },
+            ]}
+          />
+        </div>
         <DataTable
           columns={[
             { key: 'leadSource', label: 'Source' },
+            {
+              key: 'pipeline',
+              label: 'Pipeline',
+              render: (row) => <PipelineBadge pipelineType={row.pipeline} />,
+            },
             { key: 'campaign', label: 'Campaign' },
             {
               key: 'platform',
@@ -133,7 +184,7 @@ export default function AttributionPage() {
               render: (row) => `$${formatNumber(row.revenue)}`,
             },
           ]}
-          rows={rows}
+          rows={filteredRows}
           pageSize={10}
         />
       </Card>

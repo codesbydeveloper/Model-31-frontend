@@ -5,6 +5,13 @@ import {
   scoreToTier,
 } from '../../data/leads'
 import { registerLeadArrays, syncSaAssign } from './leadStore'
+import {
+  classifyLead,
+  isDealershipLead,
+  isModel31Lead,
+  isModel31Source,
+  PIPELINE_TYPES,
+} from '../../utils/pipeline'
 
 let leads = structuredClone(initialLeads)
 registerLeadArrays({ saLeads: leads })
@@ -53,13 +60,13 @@ export async function getLeadStats() {
 
 export async function getLeads() {
   await delay(350)
-  return structuredClone(leads)
+  return structuredClone(leads.map((lead) => classifyLead(lead)))
 }
 
 export async function getLeadById(id) {
   await delay(300)
   const lead = leads.find((item) => item.id === id)
-  return lead ? structuredClone(lead) : null
+  return lead ? structuredClone(classifyLead(lead)) : null
 }
 
 export async function updateLead(id, payload) {
@@ -71,6 +78,22 @@ export async function updateLead(id, payload) {
     ...leads[index],
     ...payload,
     id,
+  }
+
+  if (isDealershipLead(leads[index])) {
+    next.pipelineType = PIPELINE_TYPES.DEALERSHIP
+    next.classificationStatus = 'DEALERSHIP_LEAD'
+    if (payload.source && isModel31Source(payload.source)) {
+      next.source = leads[index].source
+    }
+    next.model31_signature = 'NOT APPLICABLE'
+    delete next.model31_tracking_id
+    delete next.content_id
+    delete next.social_origin
+    delete next.engagement_type
+    delete next.salesperson_profile_id
+  } else {
+    Object.assign(next, classifyLead(next))
   }
 
   if (typeof next.score === 'number') {
@@ -225,8 +248,51 @@ export async function createLead(payload) {
     activity: [],
   }
   pushActivity(created, 'Lead created', 'Alex Rivera')
-  leads = [created, ...leads]
-  return structuredClone(created)
+  const classified = classifyLead(created)
+  leads = [classified, ...leads]
+  rebindSa()
+  return structuredClone(classified)
+}
+
+export { classifyLead, isModel31Lead, isDealershipLead }
+
+export async function getModel31Leads() {
+  await delay(250)
+  return structuredClone(leads.filter((lead) => isModel31Lead(lead)))
+}
+
+export async function getDealershipLeads() {
+  await delay(250)
+  return structuredClone(leads.filter((lead) => isDealershipLead(lead)))
+}
+
+function pipelineStats(list) {
+  const sold = list.filter((l) => l.status === 'CLOSED' || l.status === 'SOLD').length
+  const qualified = list.filter((l) =>
+    ['QUALIFIED', 'ROUTED', 'CLOSED', 'SOLD'].includes(l.status),
+  ).length
+  const appointments = list.filter((l) =>
+    ['ROUTED', 'CLOSED', 'SOLD', 'APPOINTMENT'].includes(l.status),
+  ).length
+  const active = list.filter((l) => !['CLOSED', 'SOLD', 'NOT SOLD'].includes(l.status)).length
+  return {
+    total: list.length,
+    active,
+    qualified,
+    appointments,
+    sold,
+  }
+}
+
+export async function getPipelineTransparency() {
+  await delay(320)
+  const model31 = leads.filter((lead) => isModel31Lead(lead))
+  const dealership = leads.filter((lead) => isDealershipLead(lead))
+  return {
+    model31: pipelineStats(model31),
+    dealership: pipelineStats(dealership),
+    rows: structuredClone(leads.map((lead) => classifyLead(lead))),
+  }
 }
 
 const leadService = {
@@ -239,6 +305,12 @@ const leadService = {
   addLeadNote,
   setLeadAiPaused,
   createLead,
+  classifyLead,
+  isModel31Lead,
+  isDealershipLead,
+  getModel31Leads,
+  getDealershipLeads,
+  getPipelineTransparency,
 }
 
 export default leadService

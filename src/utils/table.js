@@ -30,6 +30,13 @@ export function statusVariant(status = '') {
       'info',
       'merged',
       'retried',
+      'verified',
+      '✓ verified',
+      'high',
+      'deal ready',
+      'manager accepted',
+      'closed',
+      'direct',
     ].includes(value)
   ) {
     return 'ready'
@@ -58,6 +65,13 @@ export function statusVariant(status = '') {
       'paused',
       'syncing',
       'reserved',
+      'not applicable',
+      'read only',
+      'off',
+      'medium',
+      'processing',
+      'manager review',
+      'qualified',
     ].includes(value)
   ) {
     return 'pending'
@@ -81,6 +95,9 @@ export function statusVariant(status = '') {
       'cancelled',
       'rejected',
       'critical',
+      'low',
+      'not available',
+      'unavailable',
     ].includes(value)
   ) {
     return 'error'

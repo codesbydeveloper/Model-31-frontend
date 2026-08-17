@@ -12,6 +12,7 @@ import Toggle from '../../components/common/Toggle'
 import { formatNumber } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
 import crmService from '../../services/mock/crmService'
+import CrmReadOnlyBanner from '../../components/leads/CrmReadOnlyBanner'
 
 export default function DealershipCrmPage() {
   const { showToast } = useToast()
@@ -64,6 +65,8 @@ export default function DealershipCrmPage() {
         description="Monitor dealership CRM synchronization and activity."
         actions={<StatusBadge status={data.status} />}
       />
+
+      <CrmReadOnlyBanner className="mb-5" />
 
       <Card className="mb-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

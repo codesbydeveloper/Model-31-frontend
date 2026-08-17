@@ -19,6 +19,7 @@ export const initialAttributionRows = [
     appointments: 14,
     soldDeals: 5,
     revenue: 248000,
+    pipeline: 'MODEL31',
   },
   {
     id: 'attr_002',
@@ -31,6 +32,7 @@ export const initialAttributionRows = [
     appointments: 11,
     soldDeals: 4,
     revenue: 176000,
+    pipeline: 'MODEL31',
   },
   {
     id: 'attr_003',
@@ -43,6 +45,7 @@ export const initialAttributionRows = [
     appointments: 9,
     soldDeals: 3,
     revenue: 118000,
+    pipeline: 'MODEL31',
   },
   {
     id: 'attr_004',
@@ -55,6 +58,7 @@ export const initialAttributionRows = [
     appointments: 7,
     soldDeals: 2,
     revenue: 92000,
+    pipeline: 'MODEL31',
   },
   {
     id: 'attr_005',
@@ -67,6 +71,7 @@ export const initialAttributionRows = [
     appointments: 8,
     soldDeals: 3,
     revenue: 129000,
+    pipeline: 'DEALERSHIP',
   },
   {
     id: 'attr_006',
@@ -79,6 +84,7 @@ export const initialAttributionRows = [
     appointments: 3,
     soldDeals: 1,
     revenue: 41000,
+    pipeline: 'DEALERSHIP',
   },
   {
     id: 'attr_007',
@@ -91,6 +97,7 @@ export const initialAttributionRows = [
     appointments: 5,
     soldDeals: 2,
     revenue: 76000,
+    pipeline: 'DEALERSHIP',
   },
   {
     id: 'attr_008',
@@ -103,6 +110,7 @@ export const initialAttributionRows = [
     appointments: 8,
     soldDeals: 3,
     revenue: 134000,
+    pipeline: 'MODEL31',
   },
   {
     id: 'attr_009',
@@ -115,6 +123,7 @@ export const initialAttributionRows = [
     appointments: 7,
     soldDeals: 2,
     revenue: 88000,
+    pipeline: 'MODEL31',
   },
   {
     id: 'attr_010',
@@ -127,5 +136,32 @@ export const initialAttributionRows = [
     appointments: 6,
     soldDeals: 2,
     revenue: 79000,
+    pipeline: 'MODEL31',
+  },
+  {
+    id: 'attr_011',
+    leadSource: 'CRM',
+    campaign: 'Dealership CRM Import',
+    platform: 'CRM',
+    content: 'VinSolutions Sync',
+    leads: 92,
+    qualifiedLeads: 40,
+    appointments: 18,
+    soldDeals: 6,
+    revenue: 264000,
+    pipeline: 'DEALERSHIP',
+  },
+  {
+    id: 'attr_012',
+    leadSource: 'Website',
+    campaign: 'Dealer Site Forms',
+    platform: 'Website',
+    content: 'Contact Form',
+    leads: 74,
+    qualifiedLeads: 31,
+    appointments: 14,
+    soldDeals: 5,
+    revenue: 198000,
+    pipeline: 'DEALERSHIP',
   },
 ]

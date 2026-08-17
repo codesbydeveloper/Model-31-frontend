@@ -16,6 +16,9 @@ import appointmentService from '../../services/mock/appointmentService'
 import { SP_LEAD_STATUSES } from '../../data/salespersonLeads'
 import CreateAppointmentModal from './appointments/CreateAppointmentModal'
 import MarkSoldModal from './leads/MarkSoldModal'
+import AcquisitionSignalsCard from '../../components/acquisition/AcquisitionSignalsCard'
+import LeadClassificationCard from '../../components/leads/LeadClassificationCard'
+import PipelineBadge from '../../components/common/PipelineBadge'
 
 function formatTime(time) {
   if (!time) return ''
@@ -146,11 +149,16 @@ export default function SalespersonLeadDetailPage() {
         description={`${lead.id} · ${lead.dealership}`}
         actions={
           <div className="flex items-center gap-2">
+            <PipelineBadge pipelineType={lead.pipelineType} />
             <StatusBadge status={lead.status} />
             <StatusBadge status={`Tier ${lead.tier}`} />
           </div>
         }
       />
+
+      <div className="mb-4">
+        <LeadClassificationCard lead={lead} />
+      </div>
 
       <Card className="mb-4">
         <div className="flex items-center justify-between">
@@ -168,6 +176,8 @@ export default function SalespersonLeadDetailPage() {
           </a>
         </div>
       </Card>
+
+      <AcquisitionSignalsCard customerName={lead.customerName} />
 
       <Card className="mb-4">
         <h2 className="text-base font-semibold">Upcoming Appointment</h2>

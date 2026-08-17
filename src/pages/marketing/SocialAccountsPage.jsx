@@ -138,6 +138,17 @@ export default function SocialAccountsPage() {
           <div className="grid gap-4">
             <Input label="Account Name" value={active.accountName} readOnly />
             <Toggle
+              label="Model 31 Source"
+              checked={Boolean(active.model31_social_source)}
+              onChange={async (next) => {
+                const updated = await socialService.updateSocialSettings(active.id, {
+                  model31_social_source: next,
+                })
+                setActive(updated)
+                await load()
+              }}
+            />
+            <Toggle
               label="Posting Enabled"
               checked={active.postingEnabled}
               onChange={async (next) => {

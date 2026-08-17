@@ -1,57 +1,79 @@
 import { delay } from '../../utils/delay'
-import { initialPersonas } from '../../data/personas'
+import { initialAcquisitionPersonas } from '../../data/personas'
 
-let personas = structuredClone(initialPersonas)
-
-function nextId() {
-  return `persona_${String(Date.now()).slice(-6)}`
-}
+let personas = structuredClone(initialAcquisitionPersonas)
 
 export async function getPersonas() {
   await delay(300)
   return structuredClone(personas)
 }
 
+export async function getPersonaById(id) {
+  await delay(220)
+  const item = personas.find((p) => p.id === id)
+  return item ? structuredClone(item) : null
+}
+
 export async function createPersona(payload) {
-  await delay(650)
-  const created = {
-    id: nextId(),
+  await delay(550)
+  const item = {
+    id: `pers_${Date.now()}`,
     name: payload.name,
     description: payload.description || '',
-    minBudget: Number(payload.minBudget) || 0,
-    maxBudget: Number(payload.maxBudget) || 0,
-    vehiclePreference: payload.vehiclePreference || '',
-    buyingTimeline: payload.buyingTimeline || '',
-    financingPreference: payload.financingPreference || '',
+    audience: payload.targetAudience || payload.audience || '',
+    targetAudience: payload.targetAudience || '',
+    tone: payload.tone || 'Friendly',
     language: payload.language || 'English',
-    status: payload.status || 'Active',
+    primaryPlatform: payload.primaryPlatform || 'Instagram',
+    platforms: [payload.primaryPlatform || 'Instagram'],
+    engagement: 0,
+    leads: 0,
+    appointments: 0,
+    sold: 0,
+    status: payload.status || 'ACTIVE',
+    followers: 0,
+    dmInteractions: 0,
+    storyInteractions: 0,
+    returningVisitors: 0,
+    intentSignals: 0,
+    chartEngagement: [
+      { name: 'W1', value: 0 },
+      { name: 'W2', value: 0 },
+      { name: 'W3', value: 0 },
+      { name: 'W4', value: 0 },
+    ],
+    chartLeads: [
+      { name: 'W1', value: 0 },
+      { name: 'W2', value: 0 },
+      { name: 'W3', value: 0 },
+      { name: 'W4', value: 0 },
+    ],
+    chartConversion: [
+      { name: 'W1', value: 0 },
+      { name: 'W2', value: 0 },
+      { name: 'W3', value: 0 },
+      { name: 'W4', value: 0 },
+    ],
   }
-  personas = [created, ...personas]
-  return structuredClone(created)
+  personas = [item, ...personas]
+  return structuredClone(item)
 }
 
 export async function updatePersona(id, payload) {
-  await delay(600)
-  const index = personas.findIndex((p) => p.id === id)
-  if (index === -1) throw new Error('Persona not found')
-  personas[index] = {
-    ...personas[index],
-    ...payload,
-    minBudget: Number(payload.minBudget),
-    maxBudget: Number(payload.maxBudget),
-    id,
-  }
-  return structuredClone(personas[index])
+  await delay(450)
+  personas = personas.map((p) => (p.id === id ? { ...p, ...payload } : p))
+  return structuredClone(personas.find((p) => p.id === id))
 }
 
 export async function deletePersona(id) {
-  await delay(500)
+  await delay(400)
   personas = personas.filter((p) => p.id !== id)
   return true
 }
 
 const personaService = {
   getPersonas,
+  getPersonaById,
   createPersona,
   updatePersona,
   deletePersona,

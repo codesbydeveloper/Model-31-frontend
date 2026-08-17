@@ -8,6 +8,8 @@ import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import salespersonService from '../../services/mock/salespersonService'
+import PipelineBadge from '../../components/common/PipelineBadge'
+import { PIPELINE_TYPES } from '../../utils/pipeline'
 
 const TABS = ['All', 'New', 'Contacted', 'Appointment', 'Sold', 'Not Sold']
 
@@ -102,9 +104,22 @@ export default function MyLeadsPage() {
                   <span className="text-[var(--text-muted)]">Timeline: </span>
                   {lead.timeline}
                 </p>
+                <p>
+                  <span className="text-[var(--text-muted)]">Source: </span>
+                  {lead.source || '—'}
+                </p>
+                <p>
+                  <span className="text-[var(--text-muted)]">Signature: </span>
+                  {lead.pipelineType === PIPELINE_TYPES.MODEL31
+                    ? '✓ VERIFIED'
+                    : 'NOT APPLICABLE'}
+                </p>
               </div>
               <div className="mt-3 flex items-center justify-between">
-                <StatusBadge status={lead.status} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <PipelineBadge pipelineType={lead.pipelineType} />
+                  <StatusBadge status={lead.status} />
+                </div>
                 <Link to={`/salesperson/leads/${lead.id}`}>
                   <Button size="sm">View</Button>
                 </Link>

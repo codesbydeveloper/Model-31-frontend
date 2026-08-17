@@ -6,7 +6,8 @@ import {
   initialBdcQueue,
 } from '../../data/bdcQueue'
 import { initialSalespeople } from '../../data/salespeople'
-import { registerLeadArrays, syncAfterBdcAssign } from './leadStore'
+import { registerLeadArrays, syncAfterBdcAssign, getStoredLead } from './leadStore'
+import { isDealershipLead, classifyLead } from '../../utils/pipeline'
 
 let queue = structuredClone(initialBdcQueue)
 let bdcLeads = structuredClone(initialBdcLeads)
@@ -42,26 +43,47 @@ export async function getBDCStats() {
   }
 }
 
+function isDealershipQueueItem(item) {
+  const stored = getStoredLead(item.id)
+  return isDealershipLead(stored || item)
+}
+
 export async function getQueue() {
   await delay(320)
   return prioritize(
     queue
-      .filter((item) => item.status === 'WAITING')
-      .map((item) => ({
-        ...item,
-        waitTime: formatWait(item.waitSeconds),
-        priority: getPriority(item.tier),
-      })),
+      .filter((item) => item.status === 'WAITING' && isDealershipQueueItem(item))
+      .map((item) => {
+        const stored = getStoredLead(item.id)
+        const classified = classifyLead(stored || item)
+        return {
+          ...item,
+          waitTime: formatWait(item.waitSeconds),
+          priority: getPriority(item.tier),
+          pipelineType: classified.pipelineType,
+          classificationStatus: classified.classificationStatus,
+          source: classified.source || item.source || 'CRM',
+        }
+      }),
   )
 }
 
 export async function getBdcLeads() {
   await delay(300)
   return structuredClone(
-    bdcLeads.map((item) => ({
-      ...item,
-      priority: getPriority(item.tier),
-    })),
+    bdcLeads
+      .filter((item) => isDealershipQueueItem(item))
+      .map((item) => {
+        const stored = getStoredLead(item.id)
+        const classified = classifyLead(stored || item)
+        return {
+          ...item,
+          priority: getPriority(item.tier),
+          pipelineType: classified.pipelineType,
+          classificationStatus: classified.classificationStatus,
+          source: classified.source || item.source || 'CRM',
+        }
+      }),
   )
 }
 
@@ -163,6 +185,46 @@ export async function escalateLead(leadId, reason = 'System escalation') {
   return { leadId, reason, status: 'ESCALATED' }
 }
 
+export async function enqueueQualifiedLead(lead) {
+  await delay(200)
+  if (!isDealershipLead(lead)) {
+    return null
+  }
+  const existing = queue.find((item) => item.id === lead.id)
+  if (existing) {
+    return structuredClone(existing)
+  }
+  const score = Number(lead.score) || 70
+  const tier = score >= 80 ? 'A' : score >= 40 ? 'B' : 'C'
+  const row = {
+    id: lead.id,
+    customerName: lead.customerName,
+    vehicle: lead.vehicle,
+    score,
+    tier,
+    location: lead.location || lead.city || 'Miami',
+    dealership: lead.dealership || 'Miami Luxury Motors',
+    created: 'Just now',
+    waitSeconds: 30,
+    status: 'WAITING',
+    budget: lead.budget || '',
+    timeline: lead.timeline || '',
+    financing: lead.financing || '',
+  }
+  queue = [row, ...queue]
+  const bdcRow = {
+    ...row,
+    status: 'WAITING',
+    bdcStatus: 'WAITING',
+    salesperson: 'Unassigned',
+    salespersonId: null,
+    responseTime: '—',
+  }
+  bdcLeads = [bdcRow, ...bdcLeads]
+  rebindRefs()
+  return structuredClone(row)
+}
+
 export async function getSalespeopleAvailability() {
   await delay(250)
   return structuredClone(salespeople)
@@ -175,6 +237,7 @@ const bdcService = {
   assignLead,
   reassignLead,
   escalateLead,
+  enqueueQualifiedLead,
   getSalespeopleAvailability,
 }
 

@@ -18,6 +18,9 @@ export const initialSocialAccounts = [
     defaultContentType: 'Social Post',
     defaultLanguage: 'English',
     defaultTimezone: 'America/New_York',
+    owner: 'Dealership Account',
+    ownerType: 'Dealership',
+    model31_social_source: false,
   },
   {
     id: 'soc_002',
@@ -36,6 +39,30 @@ export const initialSocialAccounts = [
     defaultContentType: 'Vehicle Promotion',
     defaultLanguage: 'English',
     defaultTimezone: 'America/New_York',
+    owner: 'Dealership Account',
+    ownerType: 'Dealership',
+    model31_social_source: false,
+  },
+  {
+    id: 'soc_staff_ig',
+    platform: 'Instagram',
+    status: 'CONNECTED',
+    accountName: 'John Smith',
+    environment: 'Production',
+    lastSync: '2026-08-17 09:20',
+    posts: 14,
+    followers: 6200,
+    reach: 18400,
+    engagement: 8.1,
+    leads: 9,
+    postingEnabled: false,
+    autoPublishing: false,
+    defaultContentType: 'Social Post',
+    defaultLanguage: 'English',
+    defaultTimezone: 'America/New_York',
+    owner: 'John Smith',
+    ownerType: 'Staff Account',
+    model31_social_source: true,
   },
   {
     id: 'soc_003',
@@ -54,6 +81,9 @@ export const initialSocialAccounts = [
     defaultContentType: 'Offer',
     defaultLanguage: 'English',
     defaultTimezone: 'America/New_York',
+    owner: 'Dealership Account',
+    ownerType: 'Dealership',
+    model31_social_source: false,
   },
   {
     id: 'soc_004',
@@ -72,6 +102,9 @@ export const initialSocialAccounts = [
     defaultContentType: 'Video Script',
     defaultLanguage: 'English',
     defaultTimezone: 'America/Los_Angeles',
+    owner: 'Dealership Account',
+    ownerType: 'Dealership',
+    model31_social_source: false,
   },
   {
     id: 'soc_005',
@@ -90,6 +123,9 @@ export const initialSocialAccounts = [
     defaultContentType: 'Educational',
     defaultLanguage: 'English',
     defaultTimezone: 'America/Chicago',
+    owner: 'Dealership Account',
+    ownerType: 'Dealership',
+    model31_social_source: false,
   },
   {
     id: 'soc_006',
@@ -108,6 +144,9 @@ export const initialSocialAccounts = [
     defaultContentType: 'Social Post',
     defaultLanguage: 'English',
     defaultTimezone: 'America/New_York',
+    owner: 'Dealership Account',
+    ownerType: 'Dealership',
+    model31_social_source: false,
   },
   {
     id: 'soc_007',
@@ -126,7 +165,26 @@ export const initialSocialAccounts = [
     defaultContentType: 'Social Post',
     defaultLanguage: 'English',
     defaultTimezone: 'America/Chicago',
+    owner: 'Dealership Account',
+    ownerType: 'Dealership',
+    model31_social_source: false,
   },
+]
+
+export const staffSocialLeadFlow = [
+  { step: 'Authorized Staff Instagram', detail: 'John Smith · Staff Account · MODEL 31 SOURCE: ON' },
+  { step: 'Customer DM', detail: 'Daniel Park messaged the authorized Instagram profile' },
+  { step: 'MODEL31', detail: 'Lead classified as MODEL31_LEAD before routing' },
+  { step: 'Fingerprint', detail: 'M31-TRK-2073 · CONTENT-2073 · Signature VERIFIED' },
+  { step: 'Correct Salesperson', detail: 'Routed to Michael Brown — staff member is not the lead owner' },
+]
+
+export const dealershipLeadFlow = [
+  { step: 'CRM Lead', detail: 'Sarah Johnson imported from connected CRM' },
+  { step: 'DEALERSHIP', detail: 'Classified as DEALERSHIP_LEAD' },
+  { step: 'READ ONLY', detail: 'Model 31 Access: READ ONLY' },
+  { step: 'NOT BDC MODEL31', detail: 'Eligible for dealership BDC queue only' },
+  { step: 'NOT MODEL31 ROUTING', detail: 'No Model 31 fingerprint or Model 31 routing' },
 ]
 
 export const platformPerformanceCards = [

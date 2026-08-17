@@ -16,6 +16,16 @@ export default function SocialPlatformCard({ account, onConnect, onDisconnect, o
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
         <div>
+          <dt className="text-[var(--text-muted)]">Owner</dt>
+          <dd className="font-medium">{account.owner || account.ownerType || '—'}</dd>
+        </div>
+        <div>
+          <dt className="text-[var(--text-muted)]">Model 31 Source</dt>
+          <dd className="font-medium">
+            {account.model31_social_source ? 'MODEL 31 SOURCE: ON' : 'MODEL 31 SOURCE: OFF'}
+          </dd>
+        </div>
+        <div>
           <dt className="text-[var(--text-muted)]">Last Sync</dt>
           <dd className="font-medium">{account.lastSync || '—'}</dd>
         </div>

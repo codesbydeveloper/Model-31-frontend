@@ -32,8 +32,12 @@ const refs = {
   offers: null,
 }
 
-export function registerLeadArrays(partial) {
-  Object.assign(refs, partial)
+export function registerLeadArrays(next = {}) {
+  Object.assign(refs, next)
+}
+
+export function getStoredLead(id) {
+  return refs.saLeads?.find((lead) => lead.id === id) || null
 }
 
 function upsertSpLead(payload) {

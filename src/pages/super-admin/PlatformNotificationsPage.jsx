@@ -8,6 +8,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import Select from '../../components/common/Select'
 import { useToast } from '../../hooks/useToast'
 import notificationService from '../../services/mock/notificationService'
+import { Link } from 'react-router-dom'
 
 export default function PlatformNotificationsPage() {
   const { showToast } = useToast()
@@ -95,9 +96,36 @@ export default function PlatformNotificationsPage() {
                       {item.description}
                     </p>
                     <p className="mt-2 text-xs text-[var(--text-muted)]">{item.date}</p>
+                    {item.category === 'Deal Ready for Review' && (
+                      <div className="mt-3 space-y-1 text-sm">
+                        <p>Customer: {item.customer}</p>
+                        <p>Vehicle: {item.vehicle}</p>
+                        <p>Lead Score: {item.leadScore}</p>
+                        <p>Intent: {item.intent}</p>
+                        <p>Deal Status: {item.dealStatus}</p>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <StatusBadge status={item.severity} />
+                    {item.category === 'Deal Ready for Review' && (
+                      <>
+                        <Link to={`/super-admin/deal-handoffs/${item.handoffId}`}>
+                          <Button size="sm">Review Deal</Button>
+                        </Link>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={async () => {
+                            await notificationService.dismissNotification(item.id)
+                            showToast('Alert dismissed.')
+                            await load()
+                          }}
+                        >
+                          Dismiss
+                        </Button>
+                      </>
+                    )}
                     {!item.read && (
                       <Button
                         size="sm"

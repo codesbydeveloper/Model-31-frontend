@@ -117,6 +117,27 @@ export const initialCustomers = [
       { id: 'ct_42', event: 'Deal Sold', time: 'Aug 8, 2026 17:00', detail: 'Lexus RX · $54,000' },
     ],
   },
+  {
+    id: 'cust_park',
+    name: 'Daniel Park',
+    email: 'daniel.park@example.com',
+    phone: '+1 305 555 0210',
+    location: 'Brickell, FL',
+    language: 'English',
+    autoFlowId: 'AF-C-10210',
+    crmId: null,
+    leadIds: ['LEAD-2073'],
+    channels: ['Instagram', 'DM'],
+    dealership: 'Miami Luxury Motors',
+    lastActivity: '18 minutes ago',
+    status: 'ACTIVE',
+    potentialDuplicates: [],
+    timeline: [
+      { id: 'ct_park_1', event: 'Staff Instagram DM', time: 'Aug 17, 2026 09:18', detail: 'Messaged John Smith authorized Instagram' },
+      { id: 'ct_park_2', event: 'Lead Classified', time: 'Aug 17, 2026 09:18', detail: 'MODEL31_LEAD · Fingerprint VERIFIED' },
+      { id: 'ct_park_3', event: 'Lead Routed', time: 'Aug 17, 2026 09:19', detail: 'Assigned to Michael Brown — staff is not owner' },
+    ],
+  },
 ]
 
 // Expand to ~18 customers

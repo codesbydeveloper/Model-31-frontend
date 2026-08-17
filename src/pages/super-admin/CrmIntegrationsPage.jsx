@@ -13,6 +13,7 @@ import DataTable from '../../components/common/DataTable'
 import { formatNumber } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
 import crmService from '../../services/mock/crmService'
+import CrmReadOnlyBanner from '../../components/leads/CrmReadOnlyBanner'
 
 export default function CrmIntegrationsPage() {
   const { showToast } = useToast()
@@ -75,6 +76,8 @@ export default function CrmIntegrationsPage() {
         title="CRM Integrations"
         description="Manage CRM connections, synchronization and integration health across the AutoFlow platform."
       />
+
+      <CrmReadOnlyBanner className="mb-5" />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard label="Connected CRMs" value={formatNumber(summary.connectedCrms)} />

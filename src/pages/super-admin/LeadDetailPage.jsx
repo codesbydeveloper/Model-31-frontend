@@ -28,6 +28,22 @@ import AssignSalespersonModal from './leads/AssignSalespersonModal'
 import ChangeStatusModal from './leads/ChangeStatusModal'
 import AddNoteModal from './leads/AddNoteModal'
 import EditLeadModal from './leads/EditLeadModal'
+import AcquisitionSignalsCard from '../../components/acquisition/AcquisitionSignalsCard'
+import LeadClassificationCard from '../../components/leads/LeadClassificationCard'
+import PipelineBadge from '../../components/common/PipelineBadge'
+import BuyerGenomeCard from '../../components/leads/BuyerGenomeCard'
+import BehavioralSignalsCard from '../../components/leads/BehavioralSignalsCard'
+import GenomeTimeline from '../../components/leads/GenomeTimeline'
+import AdaptiveConversationPanel from '../../components/leads/AdaptiveConversationPanel'
+import BuyOnlineCard from '../../components/leads/BuyOnlineCard'
+import VehicleVisualPackageCard from '../../components/leads/VehicleVisualPackageCard'
+import DealStatusStrip from '../../components/leads/DealStatusStrip'
+import StaffDealerFlow from '../../components/leads/StaffDealerFlow'
+import buyerGenomeService from '../../services/mock/buyerGenomeService'
+import nuclearModeService from '../../services/mock/nuclearModeService'
+import dealHandoffService from '../../services/mock/dealHandoffService'
+import visualPackageService from '../../services/mock/visualPackageService'
+import negotiationService from '../../services/mock/negotiationService'
 
 export default function LeadDetailPage() {
   const { id } = useParams()
@@ -45,17 +61,43 @@ export default function LeadDetailPage() {
   const [noteOpen, setNoteOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
+  const [genome, setGenome] = useState(null)
+  const [signals, setSignals] = useState([])
+  const [nuclear, setNuclear] = useState(null)
+  const [handoff, setHandoff] = useState(null)
+  const [visualPack, setVisualPack] = useState(null)
+  const [negotiation, setNegotiation] = useState(null)
+  const [strategyDismissed, setStrategyDismissed] = useState(false)
   const chatEndRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [leadData, conversation] = await Promise.all([
-        leadService.getLeadById(id),
-        conversationService.getConversation(id),
-      ])
+      const [leadData, conversation, genomeData, signalData, nuclearData, handoffData, packData, limits] =
+        await Promise.all([
+          leadService.getLeadById(id),
+          conversationService.getConversation(id),
+          buyerGenomeService.getBuyerGenome(id),
+          buyerGenomeService.getBehaviorSignals(id),
+          nuclearModeService.getNuclearMode(),
+          dealHandoffService.getDealHandoffByLeadId(id),
+          visualPackageService.getVehicleVisualPackage(id),
+          negotiationService.getNegotiationLimits(),
+        ])
       setLead(leadData)
       setMessages(conversation)
+      setGenome(genomeData)
+      setSignals(signalData)
+      setNuclear(nuclearData)
+      setHandoff(handoffData)
+      setVisualPack(packData)
+      setNegotiation(
+        limits.find(
+          (row) =>
+            row.vin === handoffData?.vin ||
+            (leadData?.vehicle && row.vehicle.includes(leadData.vehicle.split(' ').slice(-1)[0])),
+        ) || null,
+      )
     } finally {
       setLoading(false)
     }
@@ -176,6 +218,7 @@ export default function LeadDetailPage() {
         description={`${lead.id} · ${lead.dealership}`}
         actions={
           <div className="flex flex-wrap gap-2">
+            <PipelineBadge pipelineType={lead.pipelineType} />
             <StatusBadge status={lead.status} />
             <StatusBadge status={`Tier ${lead.tier}`} />
             <span className="inline-flex items-center rounded-full bg-[var(--brand-accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--brand-accent)]">
@@ -184,6 +227,18 @@ export default function LeadDetailPage() {
           </div>
         }
       />
+
+      <div className="mb-5">
+        <LeadClassificationCard lead={lead} />
+      </div>
+
+      <div className="mb-5">
+        <DealStatusStrip
+          nuclearOn={Boolean(nuclear?.enabled)}
+          negotiationStatus={negotiation?.status || (handoff ? 'CONFIGURED' : 'UNAVAILABLE')}
+          handoff={handoff}
+        />
+      </div>
 
       <div className="mb-5 flex flex-wrap gap-2">
         <Button size="sm" variant="secondary" onClick={() => setAssignOpen(true)}>
@@ -269,6 +324,24 @@ export default function LeadDetailPage() {
             <div ref={chatEndRef} />
           </div>
 
+          {genome && !strategyDismissed && (
+            <div className="border-t border-[var(--border-default)] p-3 sm:p-4">
+              <AdaptiveConversationPanel
+                genome={genome}
+                dismissed={strategyDismissed}
+                onUse={(text) => {
+                  setDraft(text)
+                  showToast('Suggestion added to the composer. Message was not sent.')
+                }}
+                onEdit={(text) => {
+                  setDraft(text)
+                  showToast('Suggestion loaded for editing. Message was not sent.')
+                }}
+                onDismiss={() => setStrategyDismissed(true)}
+              />
+            </div>
+          )}
+
           <form
             onSubmit={sendMessage}
             className="flex gap-2 border-t border-[var(--border-default)] p-3 sm:p-4"
@@ -324,6 +397,24 @@ export default function LeadDetailPage() {
               <InfoRow label="Created Date" value={lead.createdLabel} />
             </dl>
           </Card>
+
+          <AcquisitionSignalsCard customerName={lead.customerName} />
+
+          <BuyerGenomeCard genome={genome} />
+          <BehavioralSignalsCard signals={signals} />
+          <GenomeTimeline events={genome?.timeline || []} />
+          <BuyOnlineCard
+            nuclearOn={Boolean(nuclear?.enabled)}
+            intent={genome?.intent}
+            dealStatus={handoff?.dealStatus}
+            vehicle={handoff?.vehicle || lead.vehicle}
+          />
+          {genome?.intent === 'HIGH' && (
+            <VehicleVisualPackageCard pack={visualPack} />
+          )}
+          {lead.source === 'Authorized Staff Social Account' && (
+            <StaffDealerFlow showTransfer={handoff?.dealStatus === 'DEAL READY'} />
+          )}
 
           <Card>
             <h2 className="text-base font-semibold">Qualification</h2>

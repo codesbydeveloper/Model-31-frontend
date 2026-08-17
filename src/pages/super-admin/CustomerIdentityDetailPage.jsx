@@ -10,11 +10,20 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import Modal from '../../components/common/Modal'
 import { useToast } from '../../hooks/useToast'
 import customerIdentityService from '../../services/mock/customerIdentityService'
+import leadService from '../../services/mock/leadService'
+import PipelineBadge from '../../components/common/PipelineBadge'
+import { PIPELINE_TYPES, classifyLead } from '../../utils/pipeline'
+import BuyerGenomeCard from '../../components/leads/BuyerGenomeCard'
+import BehavioralSignalsCard from '../../components/leads/BehavioralSignalsCard'
+import buyerGenomeService from '../../services/mock/buyerGenomeService'
 
 export default function CustomerIdentityDetailPage() {
   const { id } = useParams()
   const { showToast } = useToast()
   const [customer, setCustomer] = useState(null)
+  const [linkedLeads, setLinkedLeads] = useState([])
+  const [genome, setGenome] = useState(null)
+  const [signals, setSignals] = useState([])
   const [duplicates, setDuplicates] = useState([])
   const [compare, setCompare] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -25,6 +34,23 @@ export default function CustomerIdentityDetailPage() {
     try {
       const data = await customerIdentityService.getCustomerById(id)
       setCustomer(data)
+      if (data?.leadIds?.length) {
+        const leads = await Promise.all(
+          data.leadIds.map((leadId) => leadService.getLeadById(leadId)),
+        )
+        setLinkedLeads(leads.filter(Boolean).map((lead) => classifyLead(lead)))
+        const firstId = data.leadIds[0]
+        const [g, s] = await Promise.all([
+          buyerGenomeService.getBuyerGenome(firstId),
+          buyerGenomeService.getBehaviorSignals(firstId),
+        ])
+        setGenome(g)
+        setSignals(s)
+      } else {
+        setLinkedLeads([])
+        setGenome(null)
+        setSignals([])
+      }
       if (data?.potentialDuplicates?.length) {
         const all = await customerIdentityService.getCustomerIdentity()
         setDuplicates(
@@ -78,6 +104,40 @@ export default function CustomerIdentityDetailPage() {
         description={`${customer.dealership} · ${customer.location}`}
         actions={<StatusBadge status={customer.status} />}
       />
+
+      {linkedLeads.length > 0 && (
+        <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {linkedLeads.map((lead) => {
+            const isModel31 = lead.pipelineType === PIPELINE_TYPES.MODEL31
+            return (
+              <Card key={lead.id}>
+                <h2 className="mb-3 text-base font-semibold">Lead Pipeline</h2>
+                <dl className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-[var(--text-secondary)]">Pipeline</dt>
+                    <dd>
+                      <PipelineBadge pipelineType={lead.pipelineType} />
+                    </dd>
+                  </div>
+                  <Row label="Lead Source" value={lead.source} />
+                  <Row label="Lead ID" value={lead.id} />
+                  <Row
+                    label={isModel31 ? 'Model 31 Signature' : 'Model 31 Status'}
+                    value={isModel31 ? 'Verified' : 'Read Only'}
+                  />
+                </dl>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {(genome || signals.length > 0) && (
+        <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <BuyerGenomeCard genome={genome} />
+          <BehavioralSignalsCard signals={signals} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>

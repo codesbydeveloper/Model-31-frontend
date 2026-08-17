@@ -10,6 +10,7 @@ import DataTable from '../../components/common/DataTable'
 import { useToast } from '../../hooks/useToast'
 import bdcService from '../../services/mock/bdcService'
 import BdcAssignModal from './BdcAssignModal'
+import PipelineBadge from '../../components/common/PipelineBadge'
 
 const TABS = ['All', 'Qualified', 'Assigned', 'Accepted', 'Expired', 'Escalated']
 
@@ -68,6 +69,12 @@ export default function BdcLeadsPage() {
       ),
     },
     { key: 'customerName', label: 'Customer' },
+    {
+      key: 'pipelineType',
+      label: 'Pipeline',
+      render: (row) => <PipelineBadge pipelineType={row.pipelineType} />,
+    },
+    { key: 'source', label: 'Source' },
     { key: 'vehicle', label: 'Vehicle' },
     { key: 'score', label: 'Score' },
     {
@@ -114,6 +121,9 @@ export default function BdcLeadsPage() {
         title="Qualified Leads"
         description="Review and manage BDC lead dispatch states."
       />
+      <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-muted)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+        Model 31 leads are excluded from the BDC queue.
+      </div>
 
       <div className="mb-4 flex gap-1 overflow-x-auto">
         {TABS.map((item) => (

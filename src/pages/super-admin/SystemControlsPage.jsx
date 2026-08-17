@@ -8,6 +8,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import ConfirmModal from '../../components/common/ConfirmModal'
 import { useToast } from '../../hooks/useToast'
 import systemControlService from '../../services/mock/systemControlService'
+import nuclearModeService from '../../services/mock/nuclearModeService'
 
 const GROUPS = [
   { key: 'salesperson', title: 'Salesperson Control' },
@@ -22,20 +23,25 @@ export default function SystemControlsPage() {
   const [labels, setLabels] = useState({})
   const [critical, setCritical] = useState([])
   const [summary, setSummary] = useState(null)
+  const [nuclear, setNuclear] = useState(null)
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState(null)
+  const [nuclearPending, setNuclearPending] = useState(null)
+  const [nuclearLoading, setNuclearLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [data, status] = await Promise.all([
+      const [data, status, nuclearMode] = await Promise.all([
         systemControlService.getSystemControls(),
         systemControlService.getControlStatusSummary(),
+        nuclearModeService.getNuclearMode(),
       ])
       setControls(data.controls)
       setLabels(data.labels)
       setCritical(data.critical)
       setSummary(status)
+      setNuclear(nuclearMode)
     } finally {
       setLoading(false)
     }
@@ -60,7 +66,7 @@ export default function SystemControlsPage() {
     void applyToggle(group, key, next)
   }
 
-  if (loading || !controls || !summary) {
+  if (loading || !controls || !summary || !nuclear) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <LoadingSpinner size={32} />
@@ -99,6 +105,26 @@ export default function SystemControlsPage() {
         </div>
       </Card>
 
+      <Card className="mb-5 border-[var(--brand-primary)]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Nuclear Mode</h2>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              {nuclear.description}
+            </p>
+          </div>
+          <StatusBadge status={nuclear.status} />
+        </div>
+        <div className="mt-4">
+          <Toggle
+            label="Nuclear Mode"
+            description={nuclear.enabled ? 'ON' : 'OFF'}
+            checked={nuclear.enabled}
+            onChange={(next) => setNuclearPending(next)}
+          />
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {GROUPS.map((group) => (
           <Card key={group.key}>
@@ -130,6 +156,45 @@ export default function SystemControlsPage() {
         message="Disabling this feature may prevent qualified leads from being automatically dispatched or other automation from running."
         confirmLabel="Disable"
         danger
+      />
+      <ConfirmModal
+        open={nuclearPending === true}
+        onClose={() => setNuclearPending(null)}
+        onConfirm={async () => {
+          setNuclearLoading(true)
+          try {
+            const next = await nuclearModeService.setNuclearMode(true)
+            setNuclear(next)
+            showToast('Nuclear Mode enabled (mock).')
+            setNuclearPending(null)
+          } finally {
+            setNuclearLoading(false)
+          }
+        }}
+        title="Enable Nuclear Mode?"
+        message="Nuclear Mode enables advanced deal-assistance features. All actions remain subject to dealership controls and negotiation limits."
+        confirmLabel="Enable Nuclear Mode"
+        loading={nuclearLoading}
+      />
+      <ConfirmModal
+        open={nuclearPending === false}
+        onClose={() => setNuclearPending(null)}
+        onConfirm={async () => {
+          setNuclearLoading(true)
+          try {
+            const next = await nuclearModeService.setNuclearMode(false)
+            setNuclear(next)
+            showToast('Nuclear Mode disabled (mock).')
+            setNuclearPending(null)
+          } finally {
+            setNuclearLoading(false)
+          }
+        }}
+        title="Disable Nuclear Mode?"
+        message="Advanced deal-assistance features will be disabled."
+        confirmLabel="Disable"
+        danger
+        loading={nuclearLoading}
       />
     </div>
   )

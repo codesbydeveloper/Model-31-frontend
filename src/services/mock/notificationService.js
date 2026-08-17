@@ -22,10 +22,17 @@ export async function markAllNotificationsRead() {
   return structuredClone(notifications)
 }
 
+export async function dismissNotification(id) {
+  await delay(280)
+  notifications = notifications.filter((n) => n.id !== id)
+  return structuredClone(notifications)
+}
+
 const notificationService = {
   getNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  dismissNotification,
 }
 
 export default notificationService

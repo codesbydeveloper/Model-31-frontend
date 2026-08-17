@@ -24,6 +24,8 @@ import { formatNumber, sortBy } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
 import leadService from '../../services/mock/leadService'
 import { LEAD_SOURCES, LEAD_STATUSES, LEAD_TIERS } from '../../data/leads'
+import { PIPELINE_TYPES } from '../../utils/pipeline'
+import PipelineBadge from '../../components/common/PipelineBadge'
 import AssignSalespersonModal from './leads/AssignSalespersonModal'
 import ChangeStatusModal from './leads/ChangeStatusModal'
 import AddNoteModal from './leads/AddNoteModal'
@@ -45,6 +47,7 @@ const EMPTY_FILTERS = {
   city: 'all',
   salesperson: 'all',
   source: 'all',
+  pipeline: 'all',
   scoreRange: 'all',
 }
 
@@ -141,6 +144,9 @@ export default function LeadsPage() {
     if (filters.source !== 'all') {
       list = list.filter((r) => r.source === filters.source)
     }
+    if (filters.pipeline !== 'all') {
+      list = list.filter((r) => r.pipelineType === filters.pipeline)
+    }
     list = list.filter((r) => matchesScoreRange(r.score, filters.scoreRange))
 
     const keyMap = {
@@ -211,6 +217,11 @@ export default function LeadsPage() {
     { key: 'dealership', label: 'Dealership' },
     { key: 'salesperson', label: 'Salesperson' },
     { key: 'source', label: 'Source' },
+    {
+      key: 'pipelineType',
+      label: 'Pipeline',
+      render: (row) => <PipelineBadge pipelineType={row.pipelineType} />,
+    },
     {
       key: 'createdAt',
       label: 'Created',
@@ -331,6 +342,18 @@ export default function LeadsPage() {
             options={[
               { value: 'all', label: 'All sources' },
               ...LEAD_SOURCES.map((s) => ({ value: s, label: s })),
+            ]}
+          />
+          <Select
+            value={filters.pipeline}
+            onChange={(e) => {
+              setFilters((f) => ({ ...f, pipeline: e.target.value }))
+              setPage(1)
+            }}
+            options={[
+              { value: 'all', label: 'All pipelines' },
+              { value: PIPELINE_TYPES.MODEL31, label: 'MODEL 31' },
+              { value: PIPELINE_TYPES.DEALERSHIP, label: 'DEALERSHIP' },
             ]}
           />
           <Select

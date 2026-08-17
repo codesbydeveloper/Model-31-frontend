@@ -50,6 +50,9 @@ export async function connectSocialAccount({ platform, accountName, environment 
       defaultContentType: 'Social Post',
       defaultLanguage: 'English',
       defaultTimezone: 'America/New_York',
+      owner: 'Dealership Account',
+      ownerType: 'Dealership',
+      model31_social_source: false,
     }
     accounts = [created, ...accounts]
     return structuredClone(created)

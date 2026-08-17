@@ -11,6 +11,8 @@ import EmptyState from '../../components/ui/EmptyState'
 import { useToast } from '../../hooks/useToast'
 import dispatchService from '../../services/mock/dispatchService'
 import salespersonService from '../../services/mock/salespersonService'
+import PipelineBadge from '../../components/common/PipelineBadge'
+import { classifyLead, PIPELINE_TYPES } from '../../utils/pipeline'
 
 function formatCountdown(totalSeconds) {
   const safe = Math.max(0, totalSeconds)
@@ -47,6 +49,7 @@ export default function IncomingLeadsPage() {
   }, [load])
 
   const current = offers[0]
+  const classified = current ? classifyLead(current) : null
 
   useEffect(() => {
     if (!current || expired || busy) return undefined
@@ -157,6 +160,11 @@ export default function IncomingLeadsPage() {
               </span>
               <StatusBadge status={`Tier ${current.tier}`} />
             </div>
+            {classified && (
+              <div className="mt-3 flex justify-center">
+                <PipelineBadge pipelineType={classified.pipelineType} />
+              </div>
+            )}
           </div>
 
           <dl className="space-y-2 text-sm">
@@ -166,6 +174,15 @@ export default function IncomingLeadsPage() {
             <Row label="Location" value={current.location} />
             <Row label="Financing" value={current.financing} />
             <Row label="Dealership" value={current.dealership} />
+            <Row label="Source" value={classified?.source || current.source} />
+            <Row
+              label="Model 31 Signature"
+              value={
+                classified?.pipelineType === PIPELINE_TYPES.MODEL31
+                  ? '✓ VERIFIED'
+                  : 'NOT APPLICABLE'
+              }
+            />
           </dl>
 
           {expired || secondsLeft === 0 ? (

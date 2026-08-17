@@ -11,6 +11,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { formatNumber } from '../../utils/table'
 import leadService from '../../services/mock/leadService'
+import PipelineBadge from '../../components/common/PipelineBadge'
 
 export default function DealershipLeadsPage() {
   const [rows, setRows] = useState([])
@@ -72,6 +73,12 @@ export default function DealershipLeadsPage() {
             columns={[
               { key: 'id', label: 'Lead ID' },
               { key: 'customerName', label: 'Customer' },
+              {
+                key: 'pipelineType',
+                label: 'Pipeline',
+                render: (row) => <PipelineBadge pipelineType={row.pipelineType} />,
+              },
+              { key: 'source', label: 'Source' },
               { key: 'vehicle', label: 'Vehicle' },
               { key: 'score', label: 'Score' },
               {

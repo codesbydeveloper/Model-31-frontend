@@ -158,15 +158,28 @@ export default function Sidebar({
           onWheel={(e) => e.stopPropagation()}
         >
           <ul className="flex flex-col gap-0.5 pb-2">
-            {navItems.map((item) => (
-              <NavItem
-                key={item.path}
-                item={item}
-                collapsed={isCollapsedDesktop}
-                onNavigate={onClose}
-                touchFriendly
-              />
-            ))}
+            {navItems.map((item, index) => {
+              const prevSection = navItems[index - 1]?.section
+              const showSection =
+                item.section && item.section !== prevSection && !isCollapsedDesktop
+              return (
+                <li key={item.path} className="list-none">
+                  {showSection ? (
+                    <p className="mb-1 mt-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-white/40 first:mt-0">
+                      {item.section}
+                    </p>
+                  ) : null}
+                  <ul>
+                    <NavItem
+                      item={item}
+                      collapsed={isCollapsedDesktop}
+                      onNavigate={onClose}
+                      touchFriendly
+                    />
+                  </ul>
+                </li>
+              )
+            })}
           </ul>
         </nav>
 

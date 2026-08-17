@@ -21,6 +21,9 @@ import StatusBadge from '../../components/common/StatusBadge'
 import { formatNumber } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
 import integrationService from '../../services/mock/integrationService'
+import socialService from '../../services/mock/socialService'
+import DataTable from '../../components/common/DataTable'
+import Toggle from '../../components/common/Toggle'
 
 const ICONS = {
   Facebook: Share2,
@@ -35,6 +38,7 @@ const ICONS = {
 export default function SocialIntegrationsPage() {
   const { showToast } = useToast()
   const [items, setItems] = useState([])
+  const [accounts, setAccounts] = useState([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState(null)
   const [settingsTarget, setSettingsTarget] = useState(null)
@@ -42,7 +46,12 @@ export default function SocialIntegrationsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setItems(await integrationService.getSocialIntegrations())
+      const [platforms, socialAccounts] = await Promise.all([
+        integrationService.getSocialIntegrations(),
+        socialService.getSocialAccounts(),
+      ])
+      setItems(platforms)
+      setAccounts(socialAccounts)
     } finally {
       setLoading(false)
     }
@@ -158,6 +167,59 @@ export default function SocialIntegrationsPage() {
           })}
         </div>
       )}
+
+      <Card className="mt-5">
+        <h2 className="mb-2 text-base font-semibold">Authorized Staff Social Accounts</h2>
+        <p className="mb-4 text-sm text-[var(--text-secondary)]">
+          Engagement from accounts with Model 31 Source ON is treated as a Model 31 source.
+        </p>
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <LoadingSpinner size={24} />
+          </div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'accountName', label: 'Account' },
+              { key: 'platform', label: 'Platform' },
+              {
+                key: 'ownerType',
+                label: 'Owner',
+                render: (row) => row.ownerType || row.owner || '—',
+              },
+              {
+                key: 'model31_social_source',
+                label: 'Model 31 Source',
+                render: (row) => (
+                  <div className="flex items-center gap-2">
+                    <StatusBadge
+                      status={row.model31_social_source ? 'MODEL 31 SOURCE: ON' : 'OFF'}
+                    />
+                    <Toggle
+                      checked={Boolean(row.model31_social_source)}
+                      onChange={async (next) => {
+                        await socialService.updateSocialSettings(row.id, {
+                          model31_social_source: next,
+                        })
+                        showToast('Social source setting updated.')
+                        await load()
+                      }}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'status',
+                label: 'Status',
+                render: (row) => <StatusBadge status={row.status} />,
+              },
+            ]}
+            rows={accounts}
+            pageSize={8}
+            emptyTitle="No social accounts configured."
+          />
+        )}
+      </Card>
 
       <Modal
         open={Boolean(settingsTarget)}

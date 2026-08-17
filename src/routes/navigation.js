@@ -37,6 +37,17 @@ import {
   HeartPulse,
   Bell,
   SlidersHorizontal,
+  Radar,
+  MessageCircleHeart,
+  Crosshair,
+  Gift,
+  CalendarHeart,
+  Network,
+  Globe2,
+  Split,
+  Workflow,
+  Scale,
+  FileStack,
 } from 'lucide-react'
 import { ROLES } from '../data/roles'
 
@@ -59,9 +70,9 @@ export const ROLE_NAVIGATION = {
       label: 'Dashboard',
       path: '/super-admin/dashboard',
       icon: LayoutDashboard,
-      title: 'Dashboard',
-      subtitle: 'Super Admin Dashboard',
-      description: 'Platform overview and administrative controls.',
+      title: 'Model 31 Command Center',
+      subtitle: 'Model 31 Command Center',
+      description: 'Unified lead operations, dispatch, fingerprints, BDC inbox, rooftop performance, social engine, CRM sync, and underwater rescue.',
     },
     {
       label: 'Dealerships',
@@ -191,6 +202,38 @@ export const ROLE_NAVIGATION = {
       title: 'Platform Notifications',
       subtitle: 'System alerts and integration notifications.',
       description: 'System alerts and integration notifications.',
+    },
+    {
+      label: 'Pipeline Transparency',
+      path: '/super-admin/pipeline-transparency',
+      icon: Split,
+      title: 'Pipeline Transparency',
+      subtitle: 'Monitor the separation between Model 31 leads and dealership leads.',
+      description: 'Monitor the separation between Model 31 leads and dealership leads.',
+    },
+    {
+      label: 'Negotiation Control',
+      path: '/super-admin/negotiation-control',
+      icon: Scale,
+      title: 'Negotiation Control',
+      subtitle: 'Define the limits Model 31 may use when advanced deal assistance is enabled.',
+      description: 'Define the limits Model 31 may use when advanced deal assistance is enabled.',
+    },
+    {
+      label: 'Negotiation Templates',
+      path: '/super-admin/negotiation-templates',
+      icon: FileStack,
+      title: 'Negotiation Templates',
+      subtitle: 'Reusable manager-defined price, payment and trade rules.',
+      description: 'Reusable manager-defined price, payment and trade rules.',
+    },
+    {
+      label: 'Deal Handoffs',
+      path: '/super-admin/deal-handoffs',
+      icon: Handshake,
+      title: 'Deal Handoffs',
+      subtitle: 'Review qualified buyers and structured deals requiring management attention.',
+      description: 'Review qualified buyers and structured deals requiring management attention.',
     },
     {
       label: 'System Controls',
@@ -421,6 +464,90 @@ export const ROLE_NAVIGATION = {
       description: 'Create, approve, schedule and monitor AI-powered dealership marketing content.',
     },
     {
+      label: 'Acquisition Dashboard',
+      path: '/marketing/acquisition',
+      icon: Radar,
+      title: 'Customer Acquisition',
+      subtitle:
+        'Monitor customer engagement, buying signals, referrals, personas, communities and follow-up activity.',
+      description:
+        'Monitor customer engagement, buying signals, referrals, personas, communities and follow-up activity.',
+      section: 'Customer Acquisition',
+    },
+    {
+      label: 'Engagement',
+      path: '/marketing/acquisition/engagement',
+      icon: MessageCircleHeart,
+      title: 'Engagement Tracking',
+      subtitle:
+        'Monitor customer interactions with dealership personas and marketing content.',
+      description:
+        'Monitor customer interactions with dealership personas and marketing content.',
+      section: 'Customer Acquisition',
+    },
+    {
+      label: 'Intent Signals',
+      path: '/marketing/acquisition/intent',
+      icon: Crosshair,
+      title: 'Intent Signals',
+      subtitle:
+        'Identify customer conversations and engagement signals that may indicate purchase intent.',
+      description:
+        'Identify customer conversations and engagement signals that may indicate purchase intent.',
+      section: 'Customer Acquisition',
+    },
+    {
+      label: 'Referrals',
+      path: '/marketing/acquisition/referrals',
+      icon: Gift,
+      title: 'Referral Engine',
+      subtitle: 'Track referral opportunities and customer referral activity.',
+      description: 'Track referral opportunities and customer referral activity.',
+      section: 'Customer Acquisition',
+    },
+    {
+      label: 'Life Events',
+      path: '/marketing/acquisition/life-events',
+      icon: CalendarHeart,
+      title: 'Life Event Signals',
+      subtitle:
+        'Review customer signals that may indicate a change in vehicle needs.',
+      description:
+        'Review customer signals that may indicate a change in vehicle needs.',
+      section: 'Customer Acquisition',
+    },
+    {
+      label: 'Personas',
+      path: '/marketing/acquisition/personas',
+      icon: Network,
+      title: 'Persona Network',
+      subtitle: 'Manage marketing personas and compare their audience engagement.',
+      description: 'Manage marketing personas and compare their audience engagement.',
+      section: 'Customer Acquisition',
+    },
+    {
+      label: 'Communities',
+      path: '/marketing/acquisition/communities',
+      icon: Globe2,
+      title: 'Community Groups',
+      subtitle:
+        'Track dealership community presence and customer engagement opportunities.',
+      description:
+        'Track dealership community presence and customer engagement opportunities.',
+      section: 'Customer Acquisition',
+    },
+    {
+      label: 'Follow-Up Sequences',
+      path: '/marketing/acquisition/follow-ups',
+      icon: Workflow,
+      title: 'Follow-Up Sequences',
+      subtitle:
+        'Manage structured multi-day follow-up workflows for eligible customer leads.',
+      description:
+        'Manage structured multi-day follow-up workflows for eligible customer leads.',
+      section: 'Customer Acquisition',
+    },
+    {
       label: 'AI Content',
       path: '/marketing/content',
       icon: Sparkles,
@@ -522,6 +649,18 @@ export function getPageTitle(pathname, role) {
   }
   if (/^\/salesperson\/appointments\/[^/]+$/.test(pathname)) {
     return 'Appointment Details'
+  }
+  if (/^\/marketing\/acquisition\/engagement\/[^/]+$/.test(pathname)) {
+    return 'Engagement Details'
+  }
+  if (/^\/marketing\/acquisition\/personas\/[^/]+$/.test(pathname)) {
+    return 'Persona Details'
+  }
+  if (/^\/marketing\/acquisition\/communities\/[^/]+$/.test(pathname)) {
+    return 'Community Details'
+  }
+  if (/^\/marketing\/acquisition\/follow-ups\/[^/]+$/.test(pathname)) {
+    return 'Follow-Up Sequence'
   }
   if (/^\/marketing\/content\/create$/.test(pathname)) {
     return 'Create Content'

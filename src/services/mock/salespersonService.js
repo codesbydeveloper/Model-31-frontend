@@ -10,7 +10,9 @@ import {
   syncAfterAccept,
   syncAfterDecline,
   syncSpStatusToPlatform,
+  getStoredLead,
 } from './leadStore'
+import { classifyLead } from '../../utils/pipeline'
 
 let salespeople = structuredClone(initialSalespeople)
 let myLeads = structuredClone(initialSalespersonLeads)
@@ -71,17 +73,29 @@ export async function getSalespersonStats() {
   return { ...salespersonPortalStats }
 }
 
+function withPipeline(lead) {
+  if (!lead) return lead
+  const stored = getStoredLead(lead.id)
+  return classifyLead({
+    ...lead,
+    source: lead.source || stored?.source,
+    pipelineType: stored?.pipelineType || lead.pipelineType,
+  })
+}
+
 export async function getMyLeads(salespersonId = 'sp_001') {
   await delay(300)
   return structuredClone(
-    myLeads.filter((lead) => lead.salespersonId === salespersonId),
+    myLeads
+      .filter((lead) => lead.salespersonId === salespersonId)
+      .map(withPipeline),
   )
 }
 
 export async function getMyLeadById(id) {
   await delay(250)
   const lead = myLeads.find((item) => item.id === id)
-  return lead ? structuredClone(lead) : null
+  return lead ? structuredClone(withPipeline(lead)) : null
 }
 
 export function pushLeadActivity(leadId, description, actor = 'John Smith') {

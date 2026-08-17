@@ -13,6 +13,7 @@ import DataTable from '../../components/common/DataTable'
 import { formatNumber } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
 import crmService from '../../services/mock/crmService'
+import CrmReadOnlyBanner from '../../components/leads/CrmReadOnlyBanner'
 
 const TABS = ['Connection', 'Synchronization', 'Field Mapping', 'Activity', 'Health']
 
@@ -89,6 +90,8 @@ export default function CrmIntegrationDetailPage() {
         description={`${item.environment} · Connected ${item.connectedDate}`}
         actions={<StatusBadge status={item.status} />}
       />
+
+      <CrmReadOnlyBanner className="mb-4" />
 
       <div className="mb-4 flex flex-wrap gap-2">
         <Button

@@ -31,6 +31,13 @@ import EventsPage from '../pages/super-admin/EventsPage'
 import IntegrationHealthPage from '../pages/super-admin/IntegrationHealthPage'
 import PlatformNotificationsPage from '../pages/super-admin/PlatformNotificationsPage'
 import SystemControlsPage from '../pages/super-admin/SystemControlsPage'
+import PipelineTransparencyPage from '../pages/super-admin/PipelineTransparencyPage'
+import NegotiationControlPage from '../pages/super-admin/NegotiationControlPage'
+import NegotiationLimitDetailPage from '../pages/super-admin/NegotiationLimitDetailPage'
+import NegotiationTemplatesPage from '../pages/super-admin/NegotiationTemplatesPage'
+import NegotiationTemplateDetailPage from '../pages/super-admin/NegotiationTemplateDetailPage'
+import DealHandoffsPage from '../pages/super-admin/DealHandoffsPage'
+import DealHandoffDetailPage from '../pages/super-admin/DealHandoffDetailPage'
 import DealershipDashboard from '../pages/dealership/DealershipDashboard'
 import DealershipCrmPage from '../pages/dealership/DealershipCrmPage'
 import DealershipSocialPage from '../pages/dealership/DealershipSocialPage'
@@ -70,6 +77,18 @@ import CampaignsPage from '../pages/marketing/CampaignsPage'
 import CampaignDetailPage from '../pages/marketing/CampaignDetailPage'
 import MarketingPerformancePage from '../pages/marketing/MarketingPerformancePage'
 import AttributionPage from '../pages/marketing/AttributionPage'
+import AcquisitionDashboard from '../pages/marketing/acquisition/AcquisitionDashboard'
+import EngagementPage from '../pages/marketing/acquisition/EngagementPage'
+import EngagementDetailPage from '../pages/marketing/acquisition/EngagementDetailPage'
+import IntentSignalsPage from '../pages/marketing/acquisition/IntentSignalsPage'
+import ReferralsPage from '../pages/marketing/acquisition/ReferralsPage'
+import LifeEventsPage from '../pages/marketing/acquisition/LifeEventsPage'
+import PersonasPage from '../pages/marketing/acquisition/PersonasPage'
+import PersonaDetailPage from '../pages/marketing/acquisition/PersonaDetailPage'
+import CommunitiesPage from '../pages/marketing/acquisition/CommunitiesPage'
+import CommunityDetailPage from '../pages/marketing/acquisition/CommunityDetailPage'
+import FollowUpsPage from '../pages/marketing/acquisition/FollowUpsPage'
+import FollowUpDetailPage from '../pages/marketing/acquisition/FollowUpDetailPage'
 import { useAuth } from '../hooks/useAuth'
 import { ROLES, getDashboardPathForRole } from '../data/roles'
 
@@ -177,6 +196,34 @@ export default function AppRoutes() {
             element={<PlatformNotificationsPage />}
           />
           <Route
+            path="super-admin/pipeline-transparency"
+            element={<PipelineTransparencyPage />}
+          />
+          <Route
+            path="super-admin/negotiation-control"
+            element={<NegotiationControlPage />}
+          />
+          <Route
+            path="super-admin/negotiation-control/:id"
+            element={<NegotiationLimitDetailPage />}
+          />
+          <Route
+            path="super-admin/negotiation-templates"
+            element={<NegotiationTemplatesPage />}
+          />
+          <Route
+            path="super-admin/negotiation-templates/:id"
+            element={<NegotiationTemplateDetailPage />}
+          />
+          <Route
+            path="super-admin/deal-handoffs"
+            element={<DealHandoffsPage />}
+          />
+          <Route
+            path="super-admin/deal-handoffs/:id"
+            element={<DealHandoffDetailPage />}
+          />
+          <Route
             path="super-admin/system-controls"
             element={<SystemControlsPage />}
           />
@@ -272,6 +319,54 @@ export default function AppRoutes() {
             element={<MarketingPerformancePage />}
           />
           <Route path="marketing/attribution" element={<AttributionPage />} />
+          <Route
+            path="marketing/acquisition"
+            element={<AcquisitionDashboard />}
+          />
+          <Route
+            path="marketing/acquisition/engagement"
+            element={<EngagementPage />}
+          />
+          <Route
+            path="marketing/acquisition/engagement/:id"
+            element={<EngagementDetailPage />}
+          />
+          <Route
+            path="marketing/acquisition/intent"
+            element={<IntentSignalsPage />}
+          />
+          <Route
+            path="marketing/acquisition/referrals"
+            element={<ReferralsPage />}
+          />
+          <Route
+            path="marketing/acquisition/life-events"
+            element={<LifeEventsPage />}
+          />
+          <Route
+            path="marketing/acquisition/personas"
+            element={<PersonasPage />}
+          />
+          <Route
+            path="marketing/acquisition/personas/:id"
+            element={<PersonaDetailPage />}
+          />
+          <Route
+            path="marketing/acquisition/communities"
+            element={<CommunitiesPage />}
+          />
+          <Route
+            path="marketing/acquisition/communities/:id"
+            element={<CommunityDetailPage />}
+          />
+          <Route
+            path="marketing/acquisition/follow-ups"
+            element={<FollowUpsPage />}
+          />
+          <Route
+            path="marketing/acquisition/follow-ups/:id"
+            element={<FollowUpDetailPage />}
+          />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

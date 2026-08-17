@@ -1,14 +1,29 @@
+import { classifyLead } from '../utils/pipeline'
+
 export const LEAD_STATUSES = ['NEW', 'QUALIFYING', 'QUALIFIED', 'ROUTED', 'CLOSED']
 
 export const LEAD_TIERS = ['A', 'B', 'C']
 
 export const LEAD_SOURCES = [
   'Website',
+  'CRM',
   'Facebook',
   'Instagram',
   'WhatsApp',
   'TikTok',
   'YouTube',
+  'Model 31 Content',
+  'Authorized Staff Social Account',
+  'Comment',
+  'DM',
+  'Proactive Engagement',
+  'Phone',
+  'Walk-in',
+  'Service',
+  'Showroom',
+  'Cars.com',
+  'AutoTrader',
+  'Third Party',
   'Referral',
   'Other',
 ]
@@ -51,7 +66,7 @@ const seed = [
     city: 'Miami',
     state: 'FL',
     language: 'English',
-    source: 'Website',
+    source: 'CRM',
     vehicle: '2026 Lexus RX',
     budget: '$650/month',
     budgetValue: 650,
@@ -603,7 +618,7 @@ const seed = [
     city: 'Houston',
     state: 'TX',
     language: 'English',
-    source: 'Website',
+    source: 'Walk-in',
     vehicle: '2026 Mercedes GLE',
     budget: '$830/month',
     budgetValue: 830,
@@ -617,6 +632,32 @@ const seed = [
     salesperson: 'Unassigned',
     salespersonId: null,
     createdAt: '2026-08-14T03:55:00',
+  },
+  {
+    id: 'LEAD-2073',
+    customerName: 'Daniel Park',
+    phone: '+1 305 555 0210',
+    email: 'daniel.park@example.com',
+    city: 'Miami',
+    state: 'FL',
+    language: 'English',
+    source: 'Authorized Staff Social Account',
+    vehicle: '2026 Lexus RX',
+    budget: '$620/month',
+    budgetValue: 620,
+    timeline: 'This Weekend',
+    location: 'Brickell',
+    financing: 'Lease',
+    score: 86,
+    status: 'ROUTED',
+    dealership: 'Miami Luxury Motors',
+    dealershipId: 'dlr_001',
+    salesperson: 'Michael Brown',
+    salespersonId: 'sp_002',
+    salesperson_profile_id: 'SP-102',
+    social_origin: 'Instagram',
+    engagement_type: 'DM',
+    createdAt: '2026-08-17T09:18:00',
   },
 ]
 
@@ -636,7 +677,16 @@ function defaultTimeline(lead) {
     }
   }
 
-  const items = [add(0, 'Lead Created', 'Lead entered AutoFlow')]
+  const items = [
+    add(0, 'Lead Created', 'Lead entered AutoFlow'),
+    add(
+      0,
+      'Lead Classified',
+      lead.pipelineType === 'MODEL31'
+        ? 'Classification: MODEL31_LEAD · Model 31 pipeline'
+        : 'Classification: DEALERSHIP_LEAD · Dealership pipeline',
+    ),
+  ]
   if (lead.status !== 'NEW') {
     items.push(add(1, 'Conversation Started', 'AI conversation opened'))
     items.push(add(3, 'Budget Captured', `Budget set to ${lead.budget}`))
@@ -671,21 +721,22 @@ function defaultActivity(lead) {
 }
 
 export const initialLeads = seed.map((lead) => {
-  const tier = scoreToTier(lead.score)
-  const created = new Date(lead.createdAt)
+  const classified = classifyLead(lead)
+  const tier = scoreToTier(classified.score)
+  const created = new Date(classified.createdAt)
   return {
-    ...lead,
+    ...classified,
     tier,
     aiPaused: false,
-    scoreBreakdown: breakdownFromScore(lead.score),
+    scoreBreakdown: breakdownFromScore(classified.score),
     createdLabel: created.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
     }),
     notes: [],
-    timelineEvents: defaultTimeline({ ...lead, tier }),
-    activity: defaultActivity(lead),
+    timelineEvents: defaultTimeline({ ...classified, tier }),
+    activity: defaultActivity(classified),
   }
 })
 
