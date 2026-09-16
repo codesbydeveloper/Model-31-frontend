@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
@@ -9,62 +9,82 @@ import DataTable from '../../components/common/DataTable'
 import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { formatNumber } from '../../utils/table'
-import negotiationService from '../../services/mock/negotiationService'
+import { useToast } from '../../hooks/useToast'
+import { getNegotiationLimits } from '../../services/api/superAdminNegotiationControlService'
+
+const PAGE_SIZE = 8
+const SEARCH_DEBOUNCE_MS = 400
 
 function money(value) {
   return `$${formatNumber(value)}`
 }
 
 export default function NegotiationControlPage() {
+  const { showToast } = useToast()
   const [rows, setRows] = useState([])
+  const [notice, setNotice] = useState(
+    'Model 31 cannot negotiate outside manager-defined limits. If negotiation limits are not configured, price negotiation is unavailable.',
+  )
+  const [title, setTitle] = useState('Negotiation Control')
+  const [description, setDescription] = useState(
+    'Define the limits Model 31 may use when advanced deal assistance is enabled.',
+  )
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await negotiationService.getNegotiationLimits())
+      const result = await getNegotiationLimits({
+        search: debouncedSearch,
+        page,
+        limit: PAGE_SIZE,
+      })
+      setRows(result.items)
+      setNotice(result.notice)
+      setTitle(result.pageTitle)
+      setDescription(result.description)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load negotiation control.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [debouncedSearch, page, showToast])
 
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 0)
-    return () => window.clearTimeout(t)
-  }, [load])
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter(
-      (row) =>
-        row.vin.toLowerCase().includes(q) ||
-        row.vehicle.toLowerCase().includes(q) ||
-        row.template.toLowerCase().includes(q),
-    )
-  }, [rows, search])
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
   return (
     <div className="mx-auto w-full max-w-7xl">
       <Breadcrumbs />
-      <PageHeader
-        title="Negotiation Control"
-        description="Define the limits Model 31 may use when advanced deal assistance is enabled."
-      />
+      <PageHeader title={title} description={description} />
       <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-muted)] px-4 py-3 text-sm text-[var(--text-secondary)]">
-        Model 31 cannot negotiate outside manager-defined limits. If negotiation
-        limits are not configured, price negotiation is unavailable.
+        {notice}
       </div>
       <Card>
         <div className="mb-4 max-w-md">
           <SearchInput
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search VIN, vehicle, template..."
           />
         </div>
@@ -122,10 +142,12 @@ export default function NegotiationControlPage() {
                 ),
               },
             ]}
-            rows={filtered}
+            rows={rows}
             page={page}
             onPageChange={setPage}
-            pageSize={8}
+            pageSize={PAGE_SIZE}
+            totalItems={totalItems}
+            showPagination
             emptyTitle="No negotiation limits configured."
           />
         )}

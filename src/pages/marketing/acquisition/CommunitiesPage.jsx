@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import PageHeader from '../../../components/layout/PageHeader'
 import Breadcrumbs from '../../../components/layout/Breadcrumbs'
@@ -10,44 +10,58 @@ import SearchInput from '../../../components/common/SearchInput'
 import Select from '../../../components/common/Select'
 import LoadingSpinner from '../../../components/common/LoadingSpinner'
 import { formatNumber } from '../../../utils/table'
+import { useToast } from '../../../hooks/useToast'
 import { COMMUNITY_STATUSES } from '../../../data/communities'
-import communityService from '../../../services/mock/communityService'
+import { getCommunities } from '../../../services/api/marketingCommunityService'
+
+const PAGE_SIZE = 8
+const SEARCH_DEBOUNCE_MS = 400
 
 export default function CommunitiesPage() {
+  const { showToast } = useToast()
   const [rows, setRows] = useState([])
+  const [totalItems, setTotalItems] = useState(0)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await communityService.getCommunities())
+      const result = await getCommunities({
+        page,
+        limit: PAGE_SIZE,
+        search: debouncedSearch,
+        status,
+      })
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load communities.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, debouncedSearch, status, showToast])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
-
-  const filtered = useMemo(() => {
-    let list = rows
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.platform.toLowerCase().includes(q) ||
-          r.location.toLowerCase().includes(q),
-      )
-    }
-    if (status !== 'all') list = list.filter((r) => r.status === status)
-    return list
-  }, [rows, search, status])
 
   return (
     <div className="mx-auto w-full max-w-7xl">
@@ -66,7 +80,10 @@ export default function CommunitiesPage() {
           />
           <Select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => {
+              setStatus(e.target.value)
+              setPage(1)
+            }}
             options={[
               { value: 'all', label: 'All statuses' },
               ...COMMUNITY_STATUSES.map((s) => ({ value: s, label: s })),
@@ -111,9 +128,9 @@ export default function CommunitiesPage() {
                 render: (row) => formatNumber(row.leads),
               },
               {
-                key: 'qualifiedLeads',
+                key: 'qualified',
                 label: 'Qualified',
-                render: (row) => formatNumber(row.qualifiedLeads),
+                render: (row) => formatNumber(row.qualified),
               },
               {
                 key: 'appointments',
@@ -136,10 +153,12 @@ export default function CommunitiesPage() {
                 ),
               },
             ]}
-            rows={filtered}
+            rows={rows}
             page={page}
-            pageSize={8}
+            pageSize={PAGE_SIZE}
             onPageChange={setPage}
+            totalItems={totalItems}
+            showPagination
             emptyTitle="No communities found."
           />
         )}

@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { ChevronDown, Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import Card from '../../components/common/Card'
 import Modal from '../../components/common/Modal'
 import { useAuth } from '../../hooks/useAuth'
-import { users, DEMO_PASSWORD } from '../../data/users'
 import { getDashboardPathForRole } from '../../data/roles'
 import { APP_NAME, APP_SUBTITLE } from '../../data/navigation'
-import { cn } from '../../utils/cn'
 
 const REMEMBER_EMAIL_KEY = 'autoflow_remember_email'
 
@@ -35,7 +33,6 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [demoOpen, setDemoOpen] = useState(false)
   const [forgotOpen, setForgotOpen] = useState(false)
 
   useEffect(() => {
@@ -79,19 +76,12 @@ export default function Login() {
     }
   }
 
-  const fillDemoAccount = (demoUser) => {
-    setEmail(demoUser.email)
-    setPassword(DEMO_PASSWORD)
-    setError('')
-    setDemoOpen(true)
-  }
-
   return (
     <div className="mx-auto w-full max-w-md">
       <Card className="overflow-hidden p-0">
         <div className="border-b border-[var(--border-default)] bg-[var(--bg-muted)] px-5 py-6 text-center sm:px-7">
           <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--brand-primary)] text-sm font-bold text-white">
-            AF
+            31
           </div>
           <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-2xl">
             {APP_NAME}
@@ -176,57 +166,6 @@ export default function Login() {
             {isSubmitting ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
-
-        <div className="border-t border-[var(--border-default)] px-5 py-4 sm:px-7">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between gap-2 text-left text-sm font-medium text-[var(--text-primary)]"
-            onClick={() => setDemoOpen((value) => !value)}
-            aria-expanded={demoOpen}
-          >
-            Demo Accounts
-            <ChevronDown
-              size={16}
-              className={cn(
-                'text-[var(--text-muted)] transition-transform',
-                demoOpen && 'rotate-180',
-              )}
-            />
-          </button>
-
-          {demoOpen && (
-            <ul className="mt-3 space-y-2">
-              {users.map((demoUser) => (
-                <li
-                  key={demoUser.id}
-                  className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-muted)] px-3 py-2.5"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">
-                        {demoUser.role}
-                      </p>
-                      <p className="truncate text-xs text-[var(--text-secondary)]">
-                        {demoUser.email}
-                      </p>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {DEMO_PASSWORD}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => fillDemoAccount(demoUser)}
-                    >
-                      Use Account
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
       </Card>
 
       <Modal
@@ -235,8 +174,7 @@ export default function Login() {
         title="Forgot Password"
       >
         <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
-          Password recovery will be connected later when the backend
-          authentication service is available.
+          Contact your administrator to reset your password.
         </p>
         <div className="mt-5 flex justify-end">
           <Button variant="secondary" onClick={() => setForgotOpen(false)}>

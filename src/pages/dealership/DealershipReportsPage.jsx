@@ -1,38 +1,47 @@
 import { useCallback, useEffect, useState } from 'react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
-import Card from '../../components/common/Card'
 import StatCard from '../../components/common/StatCard'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { formatNumber, formatPercent } from '../../utils/table'
-import platformAnalyticsService from '../../services/mock/platformAnalyticsService'
+import { useToast } from '../../hooks/useToast'
+import dealershipReportService from '../../services/api/dealershipReportService'
 
 export default function DealershipReportsPage() {
+  const { showToast } = useToast()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const analytics = await platformAnalyticsService.getPlatformAnalytics()
-      const miami = analytics.dealerships.find(
-        (d) => d.dealership === 'Miami Luxury Motors',
-      )
-      setData(miami || analytics.dealerships[0])
+      setData(await dealershipReportService.getDealershipReportSummary())
+    } catch (err) {
+      setData(null)
+      showToast(err.message || 'Unable to load reports.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
 
-  if (loading || !data) {
+  if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <LoadingSpinner size={32} />
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="mx-auto w-full max-w-7xl">
+        <Breadcrumbs />
+        <PageHeader title="Reports" description="Performance summary for this dealership." />
       </div>
     )
   }
@@ -50,17 +59,8 @@ export default function DealershipReportsPage() {
         <StatCard label="Appointments" value={formatNumber(data.appointments)} />
         <StatCard label="Sold" value={formatNumber(data.sold)} />
         <StatCard label="Revenue" value={`$${formatNumber(data.revenue)}`} />
-        <StatCard
-          label="Conversion Rate"
-          value={formatPercent(data.conversionRate)}
-        />
+        <StatCard label="Conversion Rate" value={formatPercent(data.conversionRate)} />
       </div>
-      <Card className="mt-5">
-        <p className="text-sm text-[var(--text-secondary)]">
-          Detailed reporting remains mock/frontend-only. Connect live analytics APIs
-          in a later backend step.
-        </p>
-      </Card>
     </div>
   )
 }

@@ -9,45 +9,130 @@ import SearchInput from '../../../components/common/SearchInput'
 import Select from '../../../components/common/Select'
 import StatCard from '../../../components/common/StatCard'
 import LoadingSpinner from '../../../components/common/LoadingSpinner'
+import Modal from '../../../components/common/Modal'
+import Input from '../../../components/common/Input'
 import { useToast } from '../../../hooks/useToast'
 import { formatNumber } from '../../../utils/table'
 import { INTENT_CATEGORIES } from '../../../data/intentSignals'
-import intentService from '../../../services/mock/intentService'
-import acquisitionService from '../../../services/mock/acquisitionService'
+import {
+  getIntentKeywords,
+  getIntentSignals,
+  getBudgetSignals,
+  linkIntentLead,
+  linkBudgetLead,
+} from '../../../services/api/marketingIntentService'
+
+const SIGNAL_PAGE_SIZE = 8
+const TABLE_PAGE_SIZE = 6
 
 export default function IntentSignalsPage() {
   const { showToast } = useToast()
-  const [intentData, setIntentData] = useState(null)
+  const [stats, setStats] = useState({
+    highIntent: 0,
+    mediumIntent: 0,
+    lowIntent: 0,
+    newSignals: 0,
+  })
+  const [keywords, setKeywords] = useState([])
+  const [signals, setSignals] = useState([])
   const [budgets, setBudgets] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [keywordTotal, setKeywordTotal] = useState(0)
+  const [signalTotal, setSignalTotal] = useState(0)
+  const [budgetTotal, setBudgetTotal] = useState(0)
+  const [keywordsLoading, setKeywordsLoading] = useState(true)
+  const [signalsLoading, setSignalsLoading] = useState(true)
+  const [budgetsLoading, setBudgetsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [level, setLevel] = useState('all')
   const [category, setCategory] = useState('all')
-  const [creatingId, setCreatingId] = useState(null)
-  const [page, setPage] = useState(1)
+  const [keywordPage, setKeywordPage] = useState(1)
+  const [signalPage, setSignalPage] = useState(1)
+  const [budgetPage, setBudgetPage] = useState(1)
+  const [linkTarget, setLinkTarget] = useState(null)
+  const [leadLabel, setLeadLabel] = useState('')
+  const [linking, setLinking] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const loadKeywords = useCallback(async () => {
+    setKeywordsLoading(true)
     try {
-      const [intent, budgetRows] = await Promise.all([
-        intentService.getIntentSignals(),
-        intentService.getBudgetSignals(),
-      ])
-      setIntentData(intent)
-      setBudgets(budgetRows)
+      const result = await getIntentKeywords({
+        page: keywordPage,
+        limit: TABLE_PAGE_SIZE,
+      })
+      setKeywords(result.items)
+      setKeywordTotal(result.total)
+      if (result.items.length === 0 && keywordPage > 1) {
+        setKeywordPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setKeywords([])
+      setKeywordTotal(0)
+      showToast(err.message || 'Unable to load keywords.', 'error')
     } finally {
-      setLoading(false)
+      setKeywordsLoading(false)
     }
-  }, [])
+  }, [keywordPage, showToast])
+
+  const loadSignals = useCallback(async () => {
+    setSignalsLoading(true)
+    try {
+      const result = await getIntentSignals({
+        page: signalPage,
+        limit: SIGNAL_PAGE_SIZE,
+      })
+      setStats(result.stats)
+      setSignals(result.items)
+      setSignalTotal(result.total)
+      if (result.items.length === 0 && signalPage > 1) {
+        setSignalPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setSignals([])
+      setSignalTotal(0)
+      showToast(err.message || 'Unable to load intent signals.', 'error')
+    } finally {
+      setSignalsLoading(false)
+    }
+  }, [signalPage, showToast])
+
+  const loadBudgets = useCallback(async () => {
+    setBudgetsLoading(true)
+    try {
+      const result = await getBudgetSignals({
+        page: budgetPage,
+        limit: TABLE_PAGE_SIZE,
+      })
+      setBudgets(result.items)
+      setBudgetTotal(result.total)
+      if (result.items.length === 0 && budgetPage > 1) {
+        setBudgetPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setBudgets([])
+      setBudgetTotal(0)
+      showToast(err.message || 'Unable to load budget signals.', 'error')
+    } finally {
+      setBudgetsLoading(false)
+    }
+  }, [budgetPage, showToast])
 
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 0)
+    const t = window.setTimeout(() => void loadKeywords(), 0)
     return () => window.clearTimeout(t)
-  }, [load])
+  }, [loadKeywords])
+
+  useEffect(() => {
+    const t = window.setTimeout(() => void loadSignals(), 0)
+    return () => window.clearTimeout(t)
+  }, [loadSignals])
+
+  useEffect(() => {
+    const t = window.setTimeout(() => void loadBudgets(), 0)
+    return () => window.clearTimeout(t)
+  }, [loadBudgets])
 
   const filtered = useMemo(() => {
-    if (!intentData) return []
-    let list = intentData.signals
+    let list = signals
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(
@@ -60,38 +145,33 @@ export default function IntentSignalsPage() {
     if (level !== 'all') list = list.filter((r) => r.intentLevel === level)
     if (category !== 'all') list = list.filter((r) => r.category === category)
     return list
-  }, [intentData, search, level, category])
+  }, [signals, search, level, category])
 
-  const createLead = async (row) => {
-    setCreatingId(row.id)
+  const openLink = (type, row) => {
+    setLinkTarget({ type, id: row.id })
+    setLeadLabel('')
+  }
+
+  const submitLink = async (e) => {
+    e.preventDefault()
+    if (!linkTarget || !leadLabel.trim()) return
+    setLinking(true)
     try {
-      await acquisitionService.createMockLeadFromSignal({
-        customerName: row.customerName,
-        vehicle: row.vehicle,
-        budget: row.budget,
-        timeline: row.timeline,
-        location: row.location,
-        financing: row.financing,
-        score: row.score,
-        intent: row.intentLevel,
-        source: 'Intent Signal',
-      })
-      showToast('Mock lead created successfully.')
-      await load()
+      if (linkTarget.type === 'budget') {
+        await linkBudgetLead(linkTarget.id, leadLabel.trim())
+        await loadBudgets()
+      } else {
+        await linkIntentLead(linkTarget.id, leadLabel.trim())
+        await loadSignals()
+      }
+      showToast(`Lead linked: ${leadLabel.trim()}`)
+      setLinkTarget(null)
+    } catch (err) {
+      showToast(err.message || 'Unable to link lead.', 'error')
     } finally {
-      setCreatingId(null)
+      setLinking(false)
     }
   }
-
-  if (loading || !intentData) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <LoadingSpinner size={32} />
-      </div>
-    )
-  }
-
-  const { stats, keywords } = intentData
 
   return (
     <div className="mx-auto w-full max-w-7xl">
@@ -110,23 +190,33 @@ export default function IntentSignalsPage() {
 
       <Card className="mt-5">
         <h2 className="mb-3 text-base font-semibold">Intent Keywords</h2>
-        <DataTable
-          columns={[
-            { key: 'keyword', label: 'Keyword' },
-            { key: 'category', label: 'Category' },
-            { key: 'occurrences', label: 'Occurrences' },
-            { key: 'customers', label: 'Customers' },
-            {
-              key: 'intentLevel',
-              label: 'Intent',
-              render: (row) => <StatusBadge status={row.intentLevel} />,
-            },
-            { key: 'lastDetected', label: 'Last Detected' },
-          ]}
-          rows={keywords}
-          pageSize={6}
-          emptyTitle="No keywords found."
-        />
+        {keywordsLoading ? (
+          <div className="flex justify-center py-16">
+            <LoadingSpinner size={28} />
+          </div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'keyword', label: 'Keyword' },
+              { key: 'category', label: 'Category' },
+              { key: 'occurrences', label: 'Occurrences' },
+              { key: 'customers', label: 'Customers' },
+              {
+                key: 'intentLevel',
+                label: 'Intent',
+                render: (row) => <StatusBadge status={row.intentLevel} />,
+              },
+              { key: 'lastDetected', label: 'Last Detected' },
+            ]}
+            rows={keywords}
+            page={keywordPage}
+            pageSize={TABLE_PAGE_SIZE}
+            onPageChange={setKeywordPage}
+            totalItems={keywordTotal}
+            showPagination
+            emptyTitle="No keywords found."
+          />
+        )}
       </Card>
 
       <Card className="mt-5">
@@ -157,107 +247,145 @@ export default function IntentSignalsPage() {
         </div>
 
         <h2 className="mb-3 text-base font-semibold">Customer Intent Signals</h2>
-        <DataTable
-          columns={[
-            { key: 'customerName', label: 'Customer' },
-            {
-              key: 'detectedPhrase',
-              label: 'Detected Phrase',
-              render: (row) => (
-                <span className="line-clamp-2 max-w-xs text-[var(--text-secondary)]">
-                  {row.detectedPhrase}
-                </span>
-              ),
-            },
-            { key: 'category', label: 'Category' },
-            { key: 'vehicle', label: 'Vehicle' },
-            { key: 'budget', label: 'Budget' },
-            { key: 'timeline', label: 'Timeline' },
-            {
-              key: 'intentLevel',
-              label: 'Intent',
-              render: (row) => <StatusBadge status={row.intentLevel} />,
-            },
-            { key: 'detectedDate', label: 'Detected' },
-            {
-              key: 'actions',
-              label: 'Actions',
-              render: (row) => {
-                if (row.leadId) {
+        {signalsLoading ? (
+          <div className="flex justify-center py-16">
+            <LoadingSpinner size={28} />
+          </div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'customerName', label: 'Customer' },
+              {
+                key: 'detectedPhrase',
+                label: 'Detected Phrase',
+                render: (row) => (
+                  <span className="line-clamp-2 max-w-xs text-[var(--text-secondary)]">
+                    {row.detectedPhrase}
+                  </span>
+                ),
+              },
+              { key: 'category', label: 'Category' },
+              { key: 'vehicle', label: 'Vehicle' },
+              { key: 'budget', label: 'Budget' },
+              { key: 'timeline', label: 'Timeline' },
+              {
+                key: 'intentLevel',
+                label: 'Intent',
+                render: (row) => <StatusBadge status={row.intentLevel} />,
+              },
+              { key: 'detectedDate', label: 'Detected' },
+              {
+                key: 'actions',
+                label: 'Actions',
+                render: (row) => {
+                  if (row.leadId) {
+                    return (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => showToast(`Lead linked: ${row.leadId}`)}
+                      >
+                        Lead Linked
+                      </Button>
+                    )
+                  }
                   return (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => showToast(`Lead linked: ${row.leadId}`)}
-                    >
-                      Lead Linked
+                    <Button size="sm" onClick={() => openLink('signal', row)}>
+                      Link Lead
                     </Button>
                   )
-                }
-                if (row.intentLevel !== 'HIGH') {
-                  return <span className="text-xs text-[var(--text-muted)]">—</span>
-                }
-                return (
-                  <Button
-                    size="sm"
-                    disabled={creatingId === row.id}
-                    onClick={() => void createLead(row)}
-                  >
-                    {creatingId === row.id ? (
-                      <LoadingSpinner size={16} />
-                    ) : (
-                      'Create Mock Lead'
-                    )}
-                  </Button>
-                )
+                },
               },
-            },
-          ]}
-          rows={filtered}
-          page={page}
-          pageSize={8}
-          onPageChange={setPage}
-          emptyTitle="No intent signals found."
-        />
+            ]}
+            rows={filtered}
+            page={signalPage}
+            pageSize={SIGNAL_PAGE_SIZE}
+            onPageChange={setSignalPage}
+            totalItems={signalTotal}
+            showPagination
+            emptyTitle="No intent signals found."
+          />
+        )}
       </Card>
 
       <Card className="mt-5">
         <h2 className="mb-3 text-base font-semibold">Budget Signals</h2>
-        <DataTable
-          columns={[
-            { key: 'customerName', label: 'Customer' },
-            { key: 'budgetSignal', label: 'Budget Signal' },
-            { key: 'paymentAmount', label: 'Payment' },
-            { key: 'financing', label: 'Financing' },
-            { key: 'vehicle', label: 'Vehicle' },
-            {
-              key: 'intent',
-              label: 'Intent',
-              render: (row) => <StatusBadge status={row.intent} />,
-            },
-            { key: 'date', label: 'Date' },
-            {
-              key: 'leadId',
-              label: 'Lead',
-              render: (row) =>
-                row.leadId ? (
-                  <button
-                    type="button"
-                    className="text-sm font-medium text-[var(--brand-accent)] hover:underline"
-                    onClick={() => showToast(`Lead linked: ${row.leadId}`)}
-                  >
-                    {row.leadId}
-                  </button>
-                ) : (
-                  '—'
-                ),
-            },
-          ]}
-          rows={budgets}
-          pageSize={6}
-          emptyTitle="No budget signals."
-        />
+        {budgetsLoading ? (
+          <div className="flex justify-center py-16">
+            <LoadingSpinner size={28} />
+          </div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'customerName', label: 'Customer' },
+              { key: 'budgetSignal', label: 'Budget Signal' },
+              { key: 'paymentAmount', label: 'Payment' },
+              { key: 'financing', label: 'Financing' },
+              { key: 'vehicle', label: 'Vehicle' },
+              {
+                key: 'intent',
+                label: 'Intent',
+                render: (row) => <StatusBadge status={row.intent} />,
+              },
+              { key: 'date', label: 'Date' },
+              {
+                key: 'leadId',
+                label: 'Lead',
+                render: (row) =>
+                  row.leadId ? (
+                    <button
+                      type="button"
+                      className="text-sm font-medium text-[var(--brand-accent)] hover:underline"
+                      onClick={() => showToast(`Lead linked: ${row.leadId}`)}
+                    >
+                      {row.leadId}
+                    </button>
+                  ) : (
+                    <Button size="sm" onClick={() => openLink('budget', row)}>
+                      Link Lead
+                    </Button>
+                  ),
+              },
+            ]}
+            rows={budgets}
+            page={budgetPage}
+            pageSize={TABLE_PAGE_SIZE}
+            onPageChange={setBudgetPage}
+            totalItems={budgetTotal}
+            showPagination
+            emptyTitle="No budget signals."
+          />
+        )}
       </Card>
+
+      <Modal
+        open={Boolean(linkTarget)}
+        onClose={() => !linking && setLinkTarget(null)}
+        title="Link Lead"
+      >
+        <form onSubmit={submitLink} className="grid gap-3">
+          <Input
+            label="Lead Label"
+            value={leadLabel}
+            onChange={(e) => setLeadLabel(e.target.value)}
+            placeholder="Lead ID"
+            required
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setLinkTarget(null)}
+              disabled={linking}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={linking || !leadLabel.trim()}>
+              {linking ? <LoadingSpinner size={16} /> : 'Link Lead'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { delay } from '../../utils/delay'
-import { AI_REPLY_POOL, buildInitialConversations } from '../../data/conversations'
+import { AI_REPLY_POOL, buildInitialConversations, genericConversation } from '../../data/conversations'
 import { initialLeads } from '../../data/leads'
 
 let conversations = buildInitialConversations(initialLeads)
@@ -18,9 +18,12 @@ function ensureConversation(leadId) {
   return conversations[leadId]
 }
 
-export async function getConversation(leadId) {
+export async function getConversation(leadId, vehicle = 'vehicle') {
   await delay(280)
-  return structuredClone(ensureConversation(leadId))
+  if (!conversations[leadId] || conversations[leadId].length === 0) {
+    conversations[leadId] = genericConversation(leadId, vehicle || 'vehicle')
+  }
+  return structuredClone(conversations[leadId])
 }
 
 export async function sendMessage(leadId, text, sender = 'agent') {

@@ -32,12 +32,14 @@ import IntegrationHealthPage from '../pages/super-admin/IntegrationHealthPage'
 import PlatformNotificationsPage from '../pages/super-admin/PlatformNotificationsPage'
 import SystemControlsPage from '../pages/super-admin/SystemControlsPage'
 import PipelineTransparencyPage from '../pages/super-admin/PipelineTransparencyPage'
+import PipelineTransparencyDetailPage from '../pages/super-admin/PipelineTransparencyDetailPage'
 import NegotiationControlPage from '../pages/super-admin/NegotiationControlPage'
 import NegotiationLimitDetailPage from '../pages/super-admin/NegotiationLimitDetailPage'
 import NegotiationTemplatesPage from '../pages/super-admin/NegotiationTemplatesPage'
 import NegotiationTemplateDetailPage from '../pages/super-admin/NegotiationTemplateDetailPage'
 import DealHandoffsPage from '../pages/super-admin/DealHandoffsPage'
 import DealHandoffDetailPage from '../pages/super-admin/DealHandoffDetailPage'
+import OemReportingPage from '../pages/super-admin/OemReportingPage'
 import DealershipDashboard from '../pages/dealership/DealershipDashboard'
 import DealershipCrmPage from '../pages/dealership/DealershipCrmPage'
 import DealershipSocialPage from '../pages/dealership/DealershipSocialPage'
@@ -66,6 +68,9 @@ import SalespersonAppointmentsPage from '../pages/salesperson/SalespersonAppoint
 import AppointmentDetailPage from '../pages/salesperson/AppointmentDetailPage'
 import SalespersonCommissionPage from '../pages/salesperson/SalespersonCommissionPage'
 import SoldDealsPage from '../pages/salesperson/SoldDealsPage'
+import SalespersonScriptsPage from '../pages/salesperson/SalespersonScriptsPage'
+import SalespersonScriptDetailPage from '../pages/salesperson/SalespersonScriptDetailPage'
+import ScriptApprovePage from '../pages/salesperson/ScriptApprovePage'
 import MarketingDashboard from '../pages/marketing/MarketingDashboard'
 import MarketingContentPage from '../pages/marketing/MarketingContentPage'
 import CreateContentPage from '../pages/marketing/CreateContentPage'
@@ -123,6 +128,7 @@ export default function AppRoutes() {
     <Routes>
       <Route element={<AuthLayout />}>
         <Route path="login" element={<Login />} />
+        <Route path="script-approve/:token" element={<ScriptApprovePage />} />
       </Route>
 
       <Route element={<ProtectedLayout />}>
@@ -181,7 +187,14 @@ export default function AppRoutes() {
             path="super-admin/social-integrations"
             element={<SocialIntegrationsPage />}
           />
-          <Route path="super-admin/analytics" element={<AnalyticsPage />} />
+          <Route
+            path="super-admin/analytics"
+            element={<AnalyticsPage />}
+          />
+          <Route
+            path="super-admin/oem-reporting"
+            element={<OemReportingPage />}
+          />
           <Route path="super-admin/events" element={<EventsPage />} />
           <Route
             path="super-admin/events/:id"
@@ -198,6 +211,10 @@ export default function AppRoutes() {
           <Route
             path="super-admin/pipeline-transparency"
             element={<PipelineTransparencyPage />}
+          />
+          <Route
+            path="super-admin/pipeline-transparency/:id"
+            element={<PipelineTransparencyDetailPage />}
           />
           <Route
             path="super-admin/negotiation-control"
@@ -299,6 +316,11 @@ export default function AppRoutes() {
           <Route
             path="salesperson/commission"
             element={<SalespersonCommissionPage />}
+          />
+          <Route path="salesperson/scripts" element={<SalespersonScriptsPage />} />
+          <Route
+            path="salesperson/scripts/:id"
+            element={<SalespersonScriptDetailPage />}
           />
         </Route>
 

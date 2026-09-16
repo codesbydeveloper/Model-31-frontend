@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
@@ -9,58 +9,76 @@ import Select from '../../components/common/Select'
 import DataTable from '../../components/common/DataTable'
 import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
-import dealHandoffService from '../../services/mock/dealHandoffService'
-import { HANDOFF_STATUSES, HANDOFF_PRIORITIES } from '../../data/dealHandoffs'
+import { useToast } from '../../hooks/useToast'
+import {
+  EMPTY_HANDOFF_PAGE,
+  getDealHandoffs,
+} from '../../services/api/superAdminDealHandoffService'
+
+const PAGE_SIZE = 8
+const SEARCH_DEBOUNCE_MS = 400
 
 export default function DealHandoffsPage() {
+  const { showToast } = useToast()
+  const [title, setTitle] = useState(EMPTY_HANDOFF_PAGE.pageTitle)
+  const [description, setDescription] = useState(EMPTY_HANDOFF_PAGE.description)
+  const [statusOptions, setStatusOptions] = useState(EMPTY_HANDOFF_PAGE.options.statuses)
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('all')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await dealHandoffService.getDealHandoffs())
+      const result = await getDealHandoffs({
+        search: debouncedSearch,
+        status,
+        page,
+        limit: PAGE_SIZE,
+      })
+      setTitle(result.pageTitle)
+      setDescription(result.description)
+      setStatusOptions(result.options.statuses)
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load deal handoffs.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [debouncedSearch, status, page, showToast])
 
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 0)
-    return () => window.clearTimeout(t)
-  }, [load])
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return rows.filter((row) => {
-      if (status !== 'all' && row.dealStatus !== status) return false
-      if (!q) return true
-      return (
-        row.customerName.toLowerCase().includes(q) ||
-        row.vehicle.toLowerCase().includes(q) ||
-        row.salesperson.toLowerCase().includes(q)
-      )
-    })
-  }, [rows, search, status])
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
   return (
     <div className="mx-auto w-full max-w-7xl">
       <Breadcrumbs />
-      <PageHeader
-        title="Deal Handoffs"
-        description="Review qualified buyers and structured deals requiring management attention."
-      />
+      <PageHeader title={title} description={description} />
       <Card>
         <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2">
           <SearchInput
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search customer, vehicle, salesperson..."
           />
           <Select
@@ -69,10 +87,7 @@ export default function DealHandoffsPage() {
               setStatus(e.target.value)
               setPage(1)
             }}
-            options={[
-              { value: 'all', label: 'All statuses' },
-              ...HANDOFF_STATUSES.map((item) => ({ value: item, label: item })),
-            ]}
+            options={statusOptions}
           />
         </div>
         {loading ? (
@@ -117,17 +132,16 @@ export default function DealHandoffsPage() {
                 ),
               },
             ]}
-            rows={filtered}
+            rows={rows}
             page={page}
             onPageChange={setPage}
-            pageSize={8}
+            pageSize={PAGE_SIZE}
+            totalItems={totalItems}
+            showPagination
             emptyTitle="No handoffs match these filters."
           />
         )}
       </Card>
-      <p className="mt-3 hidden text-xs text-[var(--text-muted)]">
-        {HANDOFF_PRIORITIES.join(' · ')}
-      </p>
     </div>
   )
 }

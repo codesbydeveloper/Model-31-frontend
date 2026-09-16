@@ -1,24 +1,31 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
+import Input from '../../components/common/Input'
 import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import ConfirmModal from '../../components/common/ConfirmModal'
+import Modal from '../../components/common/Modal'
+import ErrorState from '../../components/ui/ErrorState'
 import BuyerGenomeCard from '../../components/leads/BuyerGenomeCard'
 import BuyOnlineCard from '../../components/leads/BuyOnlineCard'
 import VehicleVisualPackageCard from '../../components/leads/VehicleVisualPackageCard'
 import StaffDealerFlow from '../../components/leads/StaffDealerFlow'
 import { useToast } from '../../hooks/useToast'
-import dealHandoffService from '../../services/mock/dealHandoffService'
-import buyerGenomeService from '../../services/mock/buyerGenomeService'
-import visualPackageService from '../../services/mock/visualPackageService'
-import nuclearModeService from '../../services/mock/nuclearModeService'
-import negotiationService from '../../services/mock/negotiationService'
-import { handoffWorkflow } from '../../data/dealHandoffs'
+import { formatNumber } from '../../utils/table'
+import {
+  acceptDealHandoff,
+  getDealHandoff,
+  getDealHandoffVisualPackage,
+  markDealHandoffClosed,
+  openDealHandoffLead,
+  requestDealHandoffInfo,
+  takeOverDealHandoff,
+} from '../../services/api/superAdminDealHandoffService'
 
 function Row({ label, value }) {
   return (
@@ -29,49 +36,75 @@ function Row({ label, value }) {
   )
 }
 
+function money(value) {
+  return `$${formatNumber(value)}`
+}
+
 export default function DealHandoffDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { showToast } = useToast()
   const [item, setItem] = useState(null)
-  const [genome, setGenome] = useState(null)
-  const [pack, setPack] = useState(null)
-  const [nuclear, setNuclear] = useState(null)
-  const [limit, setLimit] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [confirm, setConfirm] = useState(null)
+  const [actioning, setActioning] = useState(false)
+  const [infoOpen, setInfoOpen] = useState(false)
+  const [infoNote, setInfoNote] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(false)
     try {
-      const handoff = await dealHandoffService.getDealHandoff(id)
-      setItem(handoff)
-      if (handoff) {
-        const [g, v, n, limits] = await Promise.all([
-          buyerGenomeService.getBuyerGenome(handoff.leadId),
-          visualPackageService.getVehicleVisualPackage(handoff.leadId),
-          nuclearModeService.getNuclearMode(),
-          negotiationService.getNegotiationLimits(),
-        ])
-        setGenome(g)
-        setPack(v)
-        setNuclear(n)
-        setLimit(limits.find((row) => row.vin === handoff.vin) || null)
-      }
+      setItem(await getDealHandoff(id))
+    } catch (err) {
+      setItem(null)
+      setError(err.status !== 404)
+      showToast(err.message || 'Unable to load deal handoff.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showToast])
 
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 0)
-    return () => window.clearTimeout(t)
+    const timer = window.setTimeout(() => void load(), 0)
+    return () => window.clearTimeout(timer)
   }, [load])
 
-  const applyStatus = async (dealStatus, message) => {
-    const updated = await dealHandoffService.updateDealHandoff(id, { dealStatus })
-    setItem(updated)
-    setConfirm(null)
-    showToast(message)
+  const applyAction = async (run, fallbackMessage) => {
+    setActioning(true)
+    try {
+      const result = await run()
+      if (result?.handoff) {
+        setItem(result.handoff)
+      } else {
+        setItem(await getDealHandoff(id))
+      }
+      setConfirm(null)
+      setInfoOpen(false)
+      showToast(result?.message || fallbackMessage)
+    } catch (err) {
+      showToast(err.message || 'Unable to complete that action.', 'error')
+    } finally {
+      setActioning(false)
+    }
+  }
+
+  const onOpenLead = async () => {
+    setActioning(true)
+    try {
+      const result = await openDealHandoffLead(id)
+      if (result.message) showToast(result.message)
+      navigate(result.path)
+    } catch (err) {
+      if (item?.leadId) {
+        navigate(`/super-admin/leads/${item.leadId}`)
+        return
+      }
+      showToast(err.message || 'Unable to open lead.', 'error')
+    } finally {
+      setActioning(false)
+    }
   }
 
   if (loading) {
@@ -80,6 +113,10 @@ export default function DealHandoffDetailPage() {
         <LoadingSpinner size={32} />
       </div>
     )
+  }
+
+  if (error) {
+    return <ErrorState onRetry={load} />
   }
 
   if (!item) {
@@ -93,7 +130,11 @@ export default function DealHandoffDetailPage() {
     )
   }
 
-  const nuclearOn = Boolean(nuclear?.enabled)
+  const actionEnabled = (key) =>
+    item.actions?.find((action) => action.key === key)?.enabled !== false
+
+  const actionLabel = (key, fallback) =>
+    item.actions?.find((action) => action.key === key)?.label || fallback
 
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -108,7 +149,7 @@ export default function DealHandoffDetailPage() {
       </div>
       <PageHeader
         title={item.customerName}
-        description={`${item.vehicle} · ${item.vin}`}
+        description={`${item.vehicle} · ${item.vin || '—'}`}
         actions={
           <div className="flex flex-wrap gap-2">
             <StatusBadge status={item.dealStatus} />
@@ -121,38 +162,64 @@ export default function DealHandoffDetailPage() {
       <Card className="mb-4">
         <h2 className="mb-3 text-base font-semibold">Manager Handoff Flow</h2>
         <ol className="space-y-1 text-sm">
-          {handoffWorkflow.map((step, index) => (
-            <li key={step}>
-              <p className="font-medium">{step}</p>
-              {index < handoffWorkflow.length - 1 && (
+          {(item.flowSteps || []).map((step, index, list) => (
+            <li key={`${step.step}-${index}`}>
+              <p className="font-medium">{step.step}</p>
+              {step.detail ? (
+                <p className="text-xs text-[var(--text-secondary)]">{step.detail}</p>
+              ) : null}
+              {index < list.length - 1 && (
                 <p className="text-xs text-[var(--text-muted)]">↓</p>
               )}
             </li>
           ))}
         </ol>
-        <p className="mt-3 text-xs text-[var(--text-muted)]">
-          Model 31 does not automatically mark a deal as sold.
-        </p>
+        <p className="mt-3 text-xs text-[var(--text-muted)]">{item.workflowNote}</p>
       </Card>
 
       <div className="mb-4 flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => setConfirm('accept')}>
-          Accept Handoff
+        <Button
+          size="sm"
+          disabled={actioning || !actionEnabled('accept-handoff')}
+          onClick={() => setConfirm('accept')}
+        >
+          {actionLabel('accept-handoff', 'Accept Handoff')}
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => setConfirm('info')}>
-          Request More Information
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={actioning || !actionEnabled('request-more-info')}
+          onClick={() => {
+            setInfoNote('')
+            setInfoOpen(true)
+          }}
+        >
+          {actionLabel('request-more-info', 'Request More Information')}
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => setConfirm('takeover')}>
-          Take Over
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={actioning || !actionEnabled('take-over')}
+          onClick={() => setConfirm('takeover')}
+        >
+          {actionLabel('take-over', 'Take Over')}
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => setConfirm('close')}>
-          Mark Closed
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={actioning || !actionEnabled('mark-closed')}
+          onClick={() => setConfirm('close')}
+        >
+          {actionLabel('mark-closed', 'Mark Closed')}
         </Button>
-        <Link to={`/super-admin/leads/${item.leadId}`}>
-          <Button size="sm" variant="ghost">
-            Open Lead
-          </Button>
-        </Link>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={actioning || !actionEnabled('open-lead')}
+          onClick={onOpenLead}
+        >
+          {actionLabel('open-lead', 'Open Lead')}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -170,20 +237,28 @@ export default function DealHandoffDetailPage() {
             <Row label="Salesperson" value={item.salesperson} />
             <Row label="Deal Status" value={item.dealStatus} />
           </dl>
-          <p className="mt-4 text-sm text-[var(--text-secondary)]">
-            {item.conversationSummary}
-          </p>
+          {item.conversationSummary ? (
+            <p className="mt-4 text-sm text-[var(--text-secondary)]">
+              {item.conversationSummary}
+            </p>
+          ) : null}
         </Card>
-        <BuyerGenomeCard genome={genome} />
+        <BuyerGenomeCard genome={item.genome} />
         <Card>
           <h2 className="mb-3 text-base font-semibold">Negotiation Limits</h2>
-          {limit ? (
+          {item.limits ? (
             <dl className="space-y-2">
-              <Row label="Minimum Price" value={`$${limit.minPrice.toLocaleString()}`} />
-              <Row label="Maximum Discount" value={`$${limit.maxDiscount.toLocaleString()}`} />
-              <Row label="Payment" value={`$${limit.paymentMin}–$${limit.paymentMax}`} />
-              <Row label="Trade" value={`$${limit.tradeMin.toLocaleString()}–$${limit.tradeMax.toLocaleString()}`} />
-              <Row label="Template" value={limit.template} />
+              <Row label="Minimum Price" value={money(item.limits.minPrice)} />
+              <Row label="Maximum Discount" value={money(item.limits.maxDiscount)} />
+              <Row
+                label="Payment"
+                value={`${money(item.limits.paymentMin)}–${money(item.limits.paymentMax)}`}
+              />
+              <Row
+                label="Trade"
+                value={`${money(item.limits.tradeMin)}–${money(item.limits.tradeMax)}`}
+              />
+              <Row label="Template" value={item.limits.template} />
             </dl>
           ) : (
             <p className="text-sm text-[var(--text-secondary)]">
@@ -192,49 +267,93 @@ export default function DealHandoffDetailPage() {
           )}
         </Card>
         <BuyOnlineCard
-          nuclearOn={nuclearOn}
+          nuclearOn={item.buyOnline.nuclearOn}
           intent={item.intent}
           dealStatus={item.dealStatus}
-          vehicle={item.vehicle}
+          vehicle={item.buyOnline.vehicle}
+          available={item.buyOnline.available}
         />
-        {item.intent === 'HIGH' && <VehicleVisualPackageCard pack={pack} />}
-        {item.staffSocial && (
-          <StaffDealerFlow showTransfer={item.dealStatus === 'DEAL READY'} />
-        )}
+        {(item.visualPackage) ? (
+          <VehicleVisualPackageCard
+            pack={item.visualPackage}
+            description="Vehicle media for this deal."
+            loadPackage={() => getDealHandoffVisualPackage(id)}
+          />
+        ) : null}
+        {item.staffSocial ? (
+          <StaffDealerFlow
+            showTransfer={item.dealStatus === 'DEAL READY'}
+            title={item.staffFlow?.title}
+            source={item.staffFlow?.source}
+            status={item.staffFlow?.status}
+            steps={(item.staffFlow?.steps || []).map((step) =>
+              typeof step === 'string' ? step : step.step,
+            )}
+          />
+        ) : null}
       </div>
 
       <ConfirmModal
         open={confirm === 'accept'}
         onClose={() => setConfirm(null)}
-        onConfirm={() => applyStatus('MANAGER ACCEPTED', 'Handoff accepted (mock).')}
+        onConfirm={() => applyAction(() => acceptDealHandoff(id), 'Handoff accepted.')}
         title="Accept handoff?"
-        message="This mock action marks the deal as manager accepted. It does not close the sale."
+        message="This marks the deal as manager accepted. It does not close the sale."
         confirmLabel="Accept Handoff"
-      />
-      <ConfirmModal
-        open={confirm === 'info'}
-        onClose={() => setConfirm(null)}
-        onConfirm={() => applyStatus('MANAGER REVIEW', 'More information requested (mock).')}
-        title="Request more information?"
-        message="The deal will remain in manager review."
-        confirmLabel="Request Info"
+        loading={actioning}
       />
       <ConfirmModal
         open={confirm === 'takeover'}
         onClose={() => setConfirm(null)}
-        onConfirm={() => applyStatus('MANAGER ACCEPTED', 'Manager takeover recorded (mock).')}
+        onConfirm={() => applyAction(() => takeOverDealHandoff(id), 'Manager takeover recorded.')}
         title="Take over this deal?"
-        message="This is a mock takeover. No live messaging is sent."
+        message="You will take over this handoff from the current salesperson."
         confirmLabel="Take Over"
+        loading={actioning}
       />
       <ConfirmModal
         open={confirm === 'close'}
         onClose={() => setConfirm(null)}
-        onConfirm={() => applyStatus('CLOSED', 'Marked closed by manager. Not auto-sold.')}
+        onConfirm={() =>
+          applyAction(() => markDealHandoffClosed(id), 'Marked closed by manager.')
+        }
         title="Mark closed?"
         message="Model 31 will not automatically mark this deal as sold."
         confirmLabel="Mark Closed"
+        loading={actioning}
       />
+
+      <Modal
+        open={infoOpen}
+        onClose={() => !actioning && setInfoOpen(false)}
+        title="Request more information"
+      >
+        <p className="mb-3 text-sm text-[var(--text-secondary)]">
+          The deal will remain in manager review.
+        </p>
+        <Input
+          label="Note"
+          value={infoNote}
+          onChange={(e) => setInfoNote(e.target.value)}
+          placeholder="Add a note..."
+        />
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" onClick={() => setInfoOpen(false)} disabled={actioning}>
+            Cancel
+          </Button>
+          <Button
+            disabled={actioning || !infoNote.trim()}
+            onClick={() =>
+              applyAction(
+                () => requestDealHandoffInfo(id, infoNote.trim()),
+                'More information requested.',
+              )
+            }
+          >
+            {actioning ? <LoadingSpinner size={16} /> : 'Request Info'}
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

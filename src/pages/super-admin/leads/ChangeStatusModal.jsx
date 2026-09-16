@@ -4,7 +4,8 @@ import Button from '../../../components/common/Button'
 import Select from '../../../components/common/Select'
 import LoadingSpinner from '../../../components/common/LoadingSpinner'
 import { LEAD_STATUSES } from '../../../data/leads'
-import leadService from '../../../services/mock/leadService'
+import leadService from '../../../services/api/leadService'
+import { useToast } from '../../../hooks/useToast'
 
 export default function ChangeStatusModal({ open, lead, onClose, onChanged }) {
   if (!open || !lead) return null
@@ -20,6 +21,7 @@ export default function ChangeStatusModal({ open, lead, onClose, onChanged }) {
 }
 
 function ChangeStatusForm({ lead, onClose, onChanged }) {
+  const { showToast } = useToast()
   const [status, setStatus] = useState(lead.status)
   const [saving, setSaving] = useState(false)
 
@@ -28,6 +30,8 @@ function ChangeStatusForm({ lead, onClose, onChanged }) {
     try {
       await leadService.updateLeadStatus(lead.id, status)
       await onChanged?.()
+    } catch (err) {
+      showToast(err.message || 'Unable to change status.', 'error')
     } finally {
       setSaving(false)
     }

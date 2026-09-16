@@ -14,8 +14,11 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import StatusBadge from '../../components/common/StatusBadge'
 import { formatCurrencyRange, sortBy } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
-import personaService from '../../services/mock/personaService'
+import personaService from '../../services/api/personaService'
 import { LANGUAGES } from '../../data/settings'
+
+const PAGE_SIZE = 10
+const SEARCH_DEBOUNCE_MS = 400
 
 const EMPTY = {
   name: '',
@@ -29,12 +32,25 @@ const EMPTY = {
   status: 'Active',
 }
 
+function displayValue(value) {
+  if (value == null || value === '') return '—'
+  return value
+}
+
+function displayBudget(minBudget, maxBudget) {
+  if (minBudget == null && maxBudget == null) return '—'
+  if (!minBudget && !maxBudget) return '—'
+  return formatCurrencyRange(minBudget || 0, maxBudget || 0)
+}
+
 export default function BuyerPersonasPage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
   const [modalOpen, setModalOpen] = useState(false)
@@ -49,11 +65,32 @@ export default function BuyerPersonasPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await personaService.getPersonas())
+      const result = await personaService.getPersonas({
+        page,
+        limit: PAGE_SIZE,
+        search: debouncedSearch,
+      })
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load buyer personas.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, debouncedSearch, showToast])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -62,19 +99,10 @@ export default function BuyerPersonasPage() {
     return () => window.clearTimeout(timer)
   }, [load])
 
-  const filtered = useMemo(() => {
-    let list = rows
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.description.toLowerCase().includes(q) ||
-          r.vehiclePreference.toLowerCase().includes(q),
-      )
-    }
-    return sortBy(list, sortKey, sortDir)
-  }, [rows, search, sortKey, sortDir])
+  const filtered = useMemo(
+    () => sortBy(rows, sortKey, sortDir),
+    [rows, sortKey, sortDir],
+  )
 
   const openCreate = () => {
     setEditing(null)
@@ -83,21 +111,43 @@ export default function BuyerPersonasPage() {
     setModalOpen(true)
   }
 
-  const openEdit = (row) => {
+  const fillForm = (row) => ({
+    ...EMPTY,
+    ...row,
+    minBudget: row.minBudget == null ? '' : String(row.minBudget),
+    maxBudget: row.maxBudget == null ? '' : String(row.maxBudget),
+  })
+
+  const openEdit = async (row) => {
     setEditing(row)
-    setForm({
-      ...row,
-      minBudget: String(row.minBudget),
-      maxBudget: String(row.maxBudget),
-    })
+    setForm(fillForm(row))
     setErrors({})
     setModalOpen(true)
+    try {
+      const persona = await personaService.getPersonaById(row.id)
+      if (persona) {
+        setEditing(persona)
+        setForm(fillForm(persona))
+      }
+    } catch (err) {
+      showToast(err.message || 'Unable to load persona.', 'error')
+    }
+  }
+
+  const openView = async (row) => {
+    setViewing(row)
+    try {
+      const persona = await personaService.getPersonaById(row.id)
+      if (persona) setViewing(persona)
+    } catch (err) {
+      showToast(err.message || 'Unable to load persona.', 'error')
+    }
   }
 
   const onSubmit = async (e) => {
     e.preventDefault()
     const next = {}
-    if (!form.name.trim()) next.name = 'Persona name is required.'
+    if (!String(form.name || '').trim()) next.name = 'Persona name is required.'
     if (!form.minBudget) next.minBudget = 'Minimum budget is required.'
     if (!form.maxBudget) next.maxBudget = 'Maximum budget is required.'
     setErrors(next)
@@ -113,7 +163,13 @@ export default function BuyerPersonasPage() {
         showToast('Buyer persona added successfully.')
       }
       setModalOpen(false)
-      await load()
+      if (editing || page === 1) {
+        await load()
+      } else {
+        setPage(1)
+      }
+    } catch (err) {
+      showToast(err.message || 'Unable to save persona.', 'error')
     } finally {
       setSaving(false)
     }
@@ -126,6 +182,8 @@ export default function BuyerPersonasPage() {
       showToast('Buyer persona deleted successfully.')
       setDeleting(null)
       await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to delete persona.', 'error')
     } finally {
       setDeleteLoading(false)
     }
@@ -138,18 +196,30 @@ export default function BuyerPersonasPage() {
       label: 'Description',
       render: (row) => (
         <span className="line-clamp-2 max-w-xs text-[var(--text-secondary)]">
-          {row.description}
+          {displayValue(row.description)}
         </span>
       ),
     },
     {
       key: 'budget',
       label: 'Budget Range',
-      render: (row) => formatCurrencyRange(row.minBudget, row.maxBudget),
+      render: (row) => displayBudget(row.minBudget, row.maxBudget),
     },
-    { key: 'vehiclePreference', label: 'Vehicle Preference' },
-    { key: 'buyingTimeline', label: 'Buying Timeline' },
-    { key: 'financingPreference', label: 'Financing Preference' },
+    {
+      key: 'vehiclePreference',
+      label: 'Vehicle Preference',
+      render: (row) => displayValue(row.vehiclePreference),
+    },
+    {
+      key: 'buyingTimeline',
+      label: 'Buying Timeline',
+      render: (row) => displayValue(row.buyingTimeline),
+    },
+    {
+      key: 'financingPreference',
+      label: 'Financing Preference',
+      render: (row) => displayValue(row.financingPreference),
+    },
     { key: 'language', label: 'Language' },
     {
       key: 'status',
@@ -162,7 +232,7 @@ export default function BuyerPersonasPage() {
       label: 'Actions',
       render: (row) => (
         <div className="flex flex-wrap gap-1">
-          <Button variant="ghost" size="sm" onClick={() => setViewing(row)}>
+          <Button variant="ghost" size="sm" onClick={() => openView(row)}>
             <Eye size={14} />
             View
           </Button>
@@ -197,10 +267,7 @@ export default function BuyerPersonasPage() {
         <div className="mb-4">
           <SearchInput
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search personas"
             className="sm:max-w-xs"
           />
@@ -224,6 +291,9 @@ export default function BuyerPersonasPage() {
               }
             }}
             page={page}
+            pageSize={PAGE_SIZE}
+            totalItems={totalItems}
+            showPagination
             onPageChange={setPage}
             emptyTitle="No buyer personas found."
             emptyActionLabel="Add Persona"
@@ -324,22 +394,24 @@ export default function BuyerPersonasPage() {
       >
         {viewing && (
           <div className="space-y-3 text-sm">
-            <p className="text-[var(--text-secondary)]">{viewing.description}</p>
+            <p className="text-[var(--text-secondary)]">
+              {displayValue(viewing.description)}
+            </p>
             <p>
               <strong>Budget:</strong>{' '}
-              {formatCurrencyRange(viewing.minBudget, viewing.maxBudget)}
+              {displayBudget(viewing.minBudget, viewing.maxBudget)}
             </p>
             <p>
-              <strong>Vehicle:</strong> {viewing.vehiclePreference}
+              <strong>Vehicle:</strong> {displayValue(viewing.vehiclePreference)}
             </p>
             <p>
-              <strong>Timeline:</strong> {viewing.buyingTimeline}
+              <strong>Timeline:</strong> {displayValue(viewing.buyingTimeline)}
             </p>
             <p>
-              <strong>Financing:</strong> {viewing.financingPreference}
+              <strong>Financing:</strong> {displayValue(viewing.financingPreference)}
             </p>
             <p>
-              <strong>Language:</strong> {viewing.language}
+              <strong>Language:</strong> {displayValue(viewing.language)}
             </p>
             <StatusBadge status={viewing.status} />
           </div>

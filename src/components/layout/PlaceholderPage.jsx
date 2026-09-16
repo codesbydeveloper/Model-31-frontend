@@ -10,7 +10,7 @@ export default function PlaceholderPage({
   subtitle,
   description,
   showActionPlaceholders = true,
-  nextStepNote = 'This module will be implemented in the next steps.',
+  nextStepNote = 'Open a related page from the sidebar to continue.',
 }) {
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -18,7 +18,7 @@ export default function PlaceholderPage({
       <PageHeader
         title={title}
         description={description}
-        showPlaceholders={showActionPlaceholders}
+        showPlaceholders={false}
       />
       <Card>
         <h2 className="text-lg font-semibold text-[var(--text-primary)] sm:text-xl">
@@ -27,9 +27,6 @@ export default function PlaceholderPage({
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-secondary)]">
           {nextStepNote}
         </p>
-        <div className="mt-5 rounded-[var(--radius-md)] border border-dashed border-[var(--border-strong)] bg-[var(--bg-muted)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
-          Module workspace placeholder
-        </div>
       </Card>
     </div>
   )

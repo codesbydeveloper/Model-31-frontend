@@ -3,7 +3,8 @@ import Modal from '../../../components/common/Modal'
 import Button from '../../../components/common/Button'
 import Input from '../../../components/common/Input'
 import LoadingSpinner from '../../../components/common/LoadingSpinner'
-import leadService from '../../../services/mock/leadService'
+import leadService from '../../../services/api/leadService'
+import { useToast } from '../../../hooks/useToast'
 
 export default function EditLeadModal({ open, lead, onClose, onSaved }) {
   if (!open || !lead) return null
@@ -19,6 +20,7 @@ export default function EditLeadModal({ open, lead, onClose, onSaved }) {
 }
 
 function EditLeadForm({ lead, onClose, onSaved }) {
+  const { showToast } = useToast()
   const [form, setForm] = useState({
     customerName: lead.customerName || '',
     phone: lead.phone || '',
@@ -44,6 +46,8 @@ function EditLeadForm({ lead, onClose, onSaved }) {
     try {
       await leadService.updateLead(lead.id, form)
       await onSaved?.()
+    } catch (err) {
+      showToast(err.message || 'Unable to update lead.', 'error')
     } finally {
       setSaving(false)
     }

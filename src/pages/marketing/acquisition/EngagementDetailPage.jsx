@@ -8,51 +8,32 @@ import Button from '../../../components/common/Button'
 import StatCard from '../../../components/common/StatCard'
 import StatusBadge from '../../../components/common/StatusBadge'
 import LoadingSpinner from '../../../components/common/LoadingSpinner'
-import AcquisitionSignalsCard from '../../../components/acquisition/AcquisitionSignalsCard'
 import { useToast } from '../../../hooks/useToast'
 import { formatNumber } from '../../../utils/table'
-import engagementService from '../../../services/mock/engagementService'
-import acquisitionService from '../../../services/mock/acquisitionService'
+import { getMarketingEngagementById } from '../../../services/api/marketingEngagementService'
 
 export default function EngagementDetailPage() {
   const { id } = useParams()
   const { showToast } = useToast()
   const [item, setItem] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setItem(await engagementService.getEngagementByCustomer(id))
+      setItem(await getMarketingEngagementById(id))
+    } catch (err) {
+      setItem(null)
+      showToast(err.message || 'Unable to load engagement.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
-
-  const createLead = async () => {
-    if (!item) return
-    setCreating(true)
-    try {
-      await acquisitionService.createMockLeadFromSignal({
-        customerName: item.customerName,
-        source: 'Engagement Signal',
-        intent: item.engagementLevel,
-        score: item.engagementLevel === 'VERY HIGH' ? 88 : 78,
-        vehicle: 'SUV',
-        location: 'Miami',
-      })
-      showToast('Mock lead created successfully.')
-      await load()
-    } finally {
-      setCreating(false)
-    }
-  }
 
   if (loading) {
     return (
@@ -100,11 +81,7 @@ export default function EngagementDetailPage() {
               >
                 Potential Lead
               </Button>
-            ) : (
-              <Button size="sm" onClick={createLead} disabled={creating}>
-                {creating ? <LoadingSpinner size={16} /> : 'Create Mock Lead'}
-              </Button>
-            )}
+            ) : null}
           </div>
         }
       />
@@ -149,11 +126,38 @@ export default function EngagementDetailPage() {
         </Card>
       </div>
 
-      <AcquisitionSignalsCard customerName={item.customerName} />
+      {item.signals ? (
+        <Card className="mt-4">
+          <h2 className="mb-3 text-base font-semibold">Customer Acquisition Signals</h2>
+          <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { label: 'Engagement', value: item.signals.engagement, badge: true },
+              { label: 'Intent', value: item.signals.intent, badge: true },
+              { label: 'Budget', value: item.signals.budget },
+              { label: 'Life Event', value: item.signals.lifeEvent || '—' },
+              { label: 'Referral', value: item.signals.referral },
+              { label: 'Persona', value: item.signals.persona },
+              { label: 'Community', value: item.signals.community },
+              { label: 'Return Visits', value: item.signals.returnVisits },
+              { label: 'Follow-Up', value: item.signals.followUp },
+            ].map((row) => (
+              <div key={row.label}>
+                <dt className="text-[var(--text-muted)]">{row.label}</dt>
+                <dd className="mt-0.5 font-medium text-[var(--text-primary)]">
+                  {row.badge ? <StatusBadge status={String(row.value || '—')} /> : row.value || '—'}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
+      ) : null}
 
       <Card className="mt-5">
         <h2 className="mb-3 text-base font-semibold">Activity Timeline</h2>
         <ul className="space-y-2">
+          {(item.timeline || []).length === 0 && (
+            <p className="text-sm text-[var(--text-secondary)]">No activity yet.</p>
+          )}
           {(item.timeline || []).map((event) => (
             <li
               key={event.id}

@@ -6,17 +6,17 @@ export const users = [
   {
     id: 'usr_super_admin',
     name: 'Alex Rivera',
-    email: 'superadmin@autoflow.com',
+    email: 'superadmin@model31.com',
     password: DEMO_PASSWORD,
     role: ROLES.SUPER_ADMIN,
     avatar: 'AR',
     status: 'active',
-    dealership: 'AutoFlow Corporate',
+    dealership: 'Model 31 Corporate',
   },
   {
     id: 'usr_dealer_admin',
     name: 'Jordan Blake',
-    email: 'dealeradmin@autoflow.com',
+    email: 'dealeradmin@model31.com',
     password: DEMO_PASSWORD,
     role: ROLES.DEALERSHIP_ADMIN,
     avatar: 'JB',
@@ -26,7 +26,7 @@ export const users = [
   {
     id: 'usr_bdc_manager',
     name: 'Casey Morgan',
-    email: 'bdcmanager@autoflow.com',
+    email: 'bdcmanager@model31.com',
     password: DEMO_PASSWORD,
     role: ROLES.BDC_MANAGER,
     avatar: 'CM',
@@ -36,7 +36,7 @@ export const users = [
   {
     id: 'usr_salesperson',
     name: 'John Smith',
-    email: 'salesperson@autoflow.com',
+    email: 'salesperson@model31.com',
     password: DEMO_PASSWORD,
     role: ROLES.SALESPERSON,
     avatar: 'JS',
@@ -47,7 +47,7 @@ export const users = [
   {
     id: 'usr_marketing',
     name: 'Taylor Quinn',
-    email: 'marketing@autoflow.com',
+    email: 'marketing@model31.com',
     password: DEMO_PASSWORD,
     role: ROLES.MARKETING_MANAGER,
     avatar: 'TQ',
@@ -57,7 +57,10 @@ export const users = [
 ]
 
 export function findUserByCredentials(email, password) {
-  const normalizedEmail = email.trim().toLowerCase()
+  const normalizedEmail = email
+    .trim()
+    .toLowerCase()
+    .replace(/@autoflow\.com$/, '@model31.com')
   return users.find(
     (user) =>
       user.email.toLowerCase() === normalizedEmail &&

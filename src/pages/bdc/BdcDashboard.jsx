@@ -20,8 +20,8 @@ import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import DataTable from '../../components/common/DataTable'
 import { formatNumber } from '../../utils/table'
-import bdcService from '../../services/mock/bdcService'
-import appointmentService from '../../services/mock/appointmentService'
+import { useToast } from '../../hooks/useToast'
+import { getBdcDashboard } from '../../services/api/bdcDashboardService'
 
 const STATS = [
   { key: 'qualifiedToday', label: 'Qualified Today', icon: Target },
@@ -34,6 +34,7 @@ const STATS = [
 ]
 
 export default function BdcDashboard() {
+  const { showToast } = useToast()
   const [stats, setStats] = useState(null)
   const [apptStats, setApptStats] = useState(null)
   const [people, setPeople] = useState([])
@@ -42,18 +43,32 @@ export default function BdcDashboard() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [s, p, a] = await Promise.all([
-        bdcService.getBDCStats(),
-        bdcService.getSalespeopleAvailability(),
-        appointmentService.getBdcAppointmentStats(),
-      ])
-      setStats(s)
-      setPeople(p)
-      setApptStats(a)
+      const data = await getBdcDashboard()
+      setStats(data.stats)
+      setPeople(data.salespeople)
+      setApptStats(data.appointments)
+    } catch (err) {
+      setStats({
+        qualifiedToday: 0,
+        waitingForAssignment: 0,
+        assigned: 0,
+        accepted: 0,
+        expired: 0,
+        escalated: 0,
+        averageResponseTime: '—',
+      })
+      setPeople([])
+      setApptStats({
+        todaysAppointments: 0,
+        completedAppointments: 0,
+        noShows: 0,
+        appointmentConversion: 0,
+      })
+      showToast(err.message || 'Unable to load BDC dashboard.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)

@@ -28,12 +28,12 @@ import Select from '../../components/common/Select'
 import Button from '../../components/common/Button'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { formatNumber, formatPercent } from '../../utils/table'
-import marketingContentService from '../../services/mock/marketingContentService'
-import socialService from '../../services/mock/socialService'
-import marketingAnalyticsService from '../../services/mock/marketingAnalyticsService'
+import { useToast } from '../../hooks/useToast'
+import { getMarketingDashboard } from '../../services/api/marketingDashboardService'
 import PlatformBadge from '../../components/marketing/PlatformBadge'
 
 export default function MarketingDashboard() {
+  const { showToast } = useToast()
   const [stats, setStats] = useState(null)
   const [platforms, setPlatforms] = useState([])
   const [notifications, setNotifications] = useState([])
@@ -44,20 +44,30 @@ export default function MarketingDashboard() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [s, p, n, a] = await Promise.all([
-        marketingContentService.getDashboardStats(),
-        socialService.getPlatformPerformance(),
-        marketingContentService.getMarketingNotifications(),
-        marketingAnalyticsService.getMarketingAnalytics(range),
-      ])
-      setStats(s)
-      setPlatforms(p)
-      setNotifications(n)
-      setTrend(a.trend)
+      const data = await getMarketingDashboard(range)
+      setStats(data.stats)
+      setPlatforms(data.platforms)
+      setNotifications(data.notifications)
+      setTrend(data.trend)
+    } catch (err) {
+      setStats({
+        totalContent: 0,
+        pendingApproval: 0,
+        scheduledPosts: 0,
+        publishedPosts: 0,
+        activeCampaigns: 0,
+        totalReach: 0,
+        engagementRate: 0,
+        leadsGenerated: 0,
+      })
+      setPlatforms([])
+      setNotifications([])
+      setTrend([])
+      showToast(err.message || 'Unable to load marketing dashboard.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [range])
+  }, [range, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -77,10 +87,10 @@ export default function MarketingDashboard() {
       <Breadcrumbs />
       <PageHeader
         title="Marketing Dashboard"
-        description="Create, approve, schedule and monitor AI-powered dealership marketing content."
+        description="Buyer-signal support portal. Model 31 generates sales-script words only — it does not auto-publish posts or videos."
         actions={
-          <Link to="/marketing/content">
-            <Button>Create Content</Button>
+          <Link to="/marketing/content/create">
+            <Button>Create Sales Script</Button>
           </Link>
         }
       />

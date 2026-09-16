@@ -19,21 +19,26 @@ import StatCard from '../../../components/common/StatCard'
 import StatusBadge from '../../../components/common/StatusBadge'
 import LoadingSpinner from '../../../components/common/LoadingSpinner'
 import { formatNumber } from '../../../utils/table'
-import personaService from '../../../services/mock/personaService'
+import { useToast } from '../../../hooks/useToast'
+import { getMarketingPersona } from '../../../services/api/marketingPersonaService'
 
 export default function PersonaDetailPage() {
   const { id } = useParams()
+  const { showToast } = useToast()
   const [persona, setPersona] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setPersona(await personaService.getPersonaById(id))
+      setPersona(await getMarketingPersona(id))
+    } catch (err) {
+      setPersona(null)
+      showToast(err.message || 'Unable to load persona.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)

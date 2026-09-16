@@ -17,3 +17,20 @@ export const ROLE_DASHBOARD_PATHS = {
 export function getDashboardPathForRole(role) {
   return ROLE_DASHBOARD_PATHS[role] || '/login'
 }
+
+const ROLE_ALIASES = {
+  SUPER_ADMIN: ROLES.SUPER_ADMIN,
+  DEALERSHIP_ADMIN: ROLES.DEALERSHIP_ADMIN,
+  DEALER_ADMIN: ROLES.DEALERSHIP_ADMIN,
+  BDC_MANAGER: ROLES.BDC_MANAGER,
+  SALESPERSON: ROLES.SALESPERSON,
+  SALES_PERSON: ROLES.SALESPERSON,
+  MARKETING_MANAGER: ROLES.MARKETING_MANAGER,
+}
+
+export function normalizeRole(role) {
+  if (!role) return ''
+  if (ROLE_DASHBOARD_PATHS[role]) return role
+  const key = String(role).trim().toUpperCase().replace(/[\s-]+/g, '_')
+  return ROLE_ALIASES[key] || role
+}

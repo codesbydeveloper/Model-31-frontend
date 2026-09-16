@@ -31,7 +31,7 @@ export default function BuyerGenomeCard({ genome }) {
     <Card>
       <h2 className="text-base font-semibold">Buyer Genome</h2>
       <p className="mt-1 text-sm text-[var(--text-secondary)]">
-        Intent {genome.intent} · mock engagement profile
+        Intent {genome.intent}
       </p>
       <dl className="mt-4 space-y-2">
         <ScoreRow label="Urgency" score={genome.urgency} />

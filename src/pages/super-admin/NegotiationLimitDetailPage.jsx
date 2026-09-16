@@ -9,25 +9,41 @@ import Input from '../../components/common/Input'
 import Select from '../../components/common/Select'
 import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
+import ErrorState from '../../components/ui/ErrorState'
 import { useToast } from '../../hooks/useToast'
-import negotiationService from '../../services/mock/negotiationService'
+import {
+  getNegotiationLimit,
+  saveNegotiationLimit,
+} from '../../services/api/superAdminNegotiationControlService'
+
+const DEFAULT_STATUSES = [
+  { value: 'ACTIVE', label: 'ACTIVE' },
+  { value: 'INACTIVE', label: 'INACTIVE' },
+]
 
 export default function NegotiationLimitDetailPage() {
   const { id } = useParams()
   const [params] = useSearchParams()
   const { showToast } = useToast()
+  const editing = params.get('edit') === '1'
   const [item, setItem] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(false)
     try {
-      setItem(await negotiationService.getNegotiationLimit(id))
+      setItem(await getNegotiationLimit(id, { edit: editing }))
+    } catch (err) {
+      setItem(null)
+      setError(err.status !== 404)
+      showToast(err.message || 'Unable to load negotiation limits.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, editing, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -42,6 +58,10 @@ export default function NegotiationLimitDetailPage() {
     )
   }
 
+  if (error) {
+    return <ErrorState onRetry={load} />
+  }
+
   if (!item) {
     return (
       <Card className="mx-auto max-w-lg">
@@ -54,21 +74,50 @@ export default function NegotiationLimitDetailPage() {
   }
 
   const update = (key, value) => setItem((prev) => ({ ...prev, [key]: value }))
+  const statusOptions = (item.statusOptions || []).length
+    ? item.statusOptions.map((status) => ({ value: status, label: status }))
+    : DEFAULT_STATUSES
+
+  const onSave = async (event) => {
+    event.preventDefault()
+    if (!editing) return
+    setSaving(true)
+    try {
+      const saved = await saveNegotiationLimit(id, item)
+      setItem(saved)
+      showToast('Limits saved.')
+    } catch (err) {
+      showToast(err.message || 'Unable to save limits.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-3xl">
       <Breadcrumbs />
-      <div className="mb-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <Link to="/super-admin/negotiation-control">
           <Button variant="ghost" size="sm">
             <ArrowLeft size={16} />
             Back
           </Button>
         </Link>
+        {editing ? (
+          <Link to={`/super-admin/negotiation-control/${id}`}>
+            <Button size="sm" variant="secondary">
+              View
+            </Button>
+          </Link>
+        ) : (
+          <Link to={`/super-admin/negotiation-control/${id}?edit=1`}>
+            <Button size="sm">Edit</Button>
+          </Link>
+        )}
       </div>
       <PageHeader
         title={item.vehicle}
-        description={`${item.vin} · ${params.get('edit') ? 'Edit limits' : 'Negotiation limits'}`}
+        description={`${item.vin} · ${editing ? 'Edit limits' : 'Negotiation limits'}`}
         actions={<StatusBadge status={item.status} />}
       />
       <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-muted)] px-4 py-3 text-sm text-[var(--text-secondary)]">
@@ -76,66 +125,103 @@ export default function NegotiationLimitDetailPage() {
         limits are not configured, price negotiation is unavailable.
       </div>
       <Card>
-        <form
-          className="grid grid-cols-1 gap-3 sm:grid-cols-2"
-          onSubmit={async (e) => {
-            e.preventDefault()
-            setSaving(true)
-            try {
-              const saved = await negotiationService.updateNegotiationLimits(id, {
-                ...item,
-                minPrice: Number(item.minPrice),
-                maxDiscount: Number(item.maxDiscount),
-                paymentMin: Number(item.paymentMin),
-                paymentMax: Number(item.paymentMax),
-                tradeMin: Number(item.tradeMin),
-                tradeMax: Number(item.tradeMax),
-                msrp: Number(item.msrp),
-                currentPrice: Number(item.currentPrice),
-              })
-              setItem(saved)
-              showToast('Limits saved (mock).')
-            } finally {
-              setSaving(false)
-            }
-          }}
-        >
-          <Input label="Vehicle" value={item.vehicle} onChange={(e) => update('vehicle', e.target.value)} />
-          <Input label="VIN" value={item.vin} onChange={(e) => update('vin', e.target.value)} />
-          <Input label="MSRP" type="number" value={item.msrp} onChange={(e) => update('msrp', e.target.value)} />
-          <Input label="Current Price" type="number" value={item.currentPrice} onChange={(e) => update('currentPrice', e.target.value)} />
-          <Input label="Minimum Price" type="number" value={item.minPrice} onChange={(e) => update('minPrice', e.target.value)} />
-          <Input label="Maximum Discount" type="number" value={item.maxDiscount} onChange={(e) => update('maxDiscount', e.target.value)} />
-          <Input label="Minimum Payment" type="number" value={item.paymentMin} onChange={(e) => update('paymentMin', e.target.value)} />
-          <Input label="Maximum Payment" type="number" value={item.paymentMax} onChange={(e) => update('paymentMax', e.target.value)} />
-          <Input label="Minimum Trade Value" type="number" value={item.tradeMin} onChange={(e) => update('tradeMin', e.target.value)} />
-          <Input label="Maximum Trade Value" type="number" value={item.tradeMax} onChange={(e) => update('tradeMax', e.target.value)} />
+        <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={onSave}>
+          <Input
+            label="Vehicle"
+            value={item.vehicle}
+            disabled={!editing}
+            onChange={(e) => update('vehicle', e.target.value)}
+          />
+          <Input
+            label="VIN"
+            value={item.vin}
+            disabled={!editing}
+            onChange={(e) => update('vin', e.target.value)}
+          />
+          <Input
+            label="MSRP"
+            type="number"
+            value={item.msrp}
+            disabled={!editing}
+            onChange={(e) => update('msrp', e.target.value)}
+          />
+          <Input
+            label="Current Price"
+            type="number"
+            value={item.currentPrice}
+            disabled={!editing}
+            onChange={(e) => update('currentPrice', e.target.value)}
+          />
+          <Input
+            label="Minimum Price"
+            type="number"
+            value={item.minPrice}
+            disabled={!editing}
+            onChange={(e) => update('minPrice', e.target.value)}
+          />
+          <Input
+            label="Maximum Discount"
+            type="number"
+            value={item.maxDiscount}
+            disabled={!editing}
+            onChange={(e) => update('maxDiscount', e.target.value)}
+          />
+          <Input
+            label="Minimum Payment"
+            type="number"
+            value={item.paymentMin}
+            disabled={!editing}
+            onChange={(e) => update('paymentMin', e.target.value)}
+          />
+          <Input
+            label="Maximum Payment"
+            type="number"
+            value={item.paymentMax}
+            disabled={!editing}
+            onChange={(e) => update('paymentMax', e.target.value)}
+          />
+          <Input
+            label="Minimum Trade Value"
+            type="number"
+            value={item.tradeMin}
+            disabled={!editing}
+            onChange={(e) => update('tradeMin', e.target.value)}
+          />
+          <Input
+            label="Maximum Trade Value"
+            type="number"
+            value={item.tradeMax}
+            disabled={!editing}
+            onChange={(e) => update('tradeMax', e.target.value)}
+          />
           <Input
             label="Allowed Incentives"
-            value={(item.allowedIncentives || []).join(', ')}
-            onChange={(e) => update('allowedIncentives', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
+            value={item.allowedIncentives || ''}
+            disabled={!editing}
+            onChange={(e) => update('allowedIncentives', e.target.value)}
             containerClassName="sm:col-span-2"
           />
           <Input
             label="Allowed Fees"
-            value={(item.allowedFees || []).join(', ')}
-            onChange={(e) => update('allowedFees', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
+            value={item.allowedFees || ''}
+            disabled={!editing}
+            onChange={(e) => update('allowedFees', e.target.value)}
             containerClassName="sm:col-span-2"
           />
           <Select
             label="Status"
             value={item.status}
+            disabled={!editing}
             onChange={(e) => update('status', e.target.value)}
-            options={[
-              { value: 'ACTIVE', label: 'ACTIVE' },
-              { value: 'INACTIVE', label: 'INACTIVE' },
-            ]}
+            options={statusOptions}
           />
-          <div className="flex items-end">
-            <Button type="submit" disabled={saving}>
-              {saving ? <LoadingSpinner size={16} /> : 'Save Changes'}
-            </Button>
-          </div>
+          {editing ? (
+            <div className="flex items-end">
+              <Button type="submit" disabled={saving}>
+                {saving ? <LoadingSpinner size={16} /> : 'Save Changes'}
+              </Button>
+            </div>
+          ) : null}
         </form>
       </Card>
     </div>

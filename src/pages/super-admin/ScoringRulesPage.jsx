@@ -7,15 +7,21 @@ import Input from '../../components/common/Input'
 import FunnelVisual from '../../components/common/FunnelVisual'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { useToast } from '../../hooks/useToast'
-import settingsService from '../../services/mock/settingsService'
+import scoringRulesService from '../../services/api/scoringRulesService'
 import { funnelStages } from '../../data/analytics'
 
 const WEIGHT_FIELDS = [
   { key: 'budget', label: 'Budget' },
-  { key: 'vehicle', label: 'Desired Vehicle' },
-  { key: 'timeline', label: 'Buying Timeline' },
+  { key: 'desiredVehicle', label: 'Desired Vehicle' },
+  { key: 'buyingTimeline', label: 'Buying Timeline' },
   { key: 'location', label: 'Location / Neighborhood' },
-  { key: 'financing', label: 'Financing Preference' },
+  { key: 'financingPreference', label: 'Financing Preference' },
+]
+
+const TIER_FIELDS = [
+  { key: 'tierA', label: 'A' },
+  { key: 'tierB', label: 'B' },
+  { key: 'tierC', label: 'C' },
 ]
 
 export default function ScoringRulesPage() {
@@ -26,11 +32,24 @@ export default function ScoringRulesPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let active = true
     ;(async () => {
       setLoading(true)
-      setRules(await settingsService.getScoringRules())
-      setLoading(false)
+      try {
+        const data = await scoringRulesService.getScoringRules()
+        if (active) setRules(data)
+      } catch (err) {
+        if (active) {
+          setRules(null)
+          setError(err.message || 'Unable to load scoring rules.')
+        }
+      } finally {
+        if (active) setLoading(false)
+      }
     })()
+    return () => {
+      active = false
+    }
   }, [])
 
   const total = useMemo(() => {
@@ -64,34 +83,49 @@ export default function ScoringRulesPage() {
       setError('Total scoring weight must equal 100 points.')
       return
     }
-    if (
-      rules.tiers.a.min <= rules.tiers.b.max ||
-      rules.tiers.b.min <= rules.tiers.c.max
-    ) {
-      // allow contiguous ranges; validate a.min > b.max roughly for clarity
-    }
-    if (rules.tiers.a.min <= rules.tiers.b.min) {
+    if (rules.tiers.tierA.min <= rules.tiers.tierB.min) {
       setError('Tier A minimum should be greater than Tier B minimum.')
       return
     }
-    if (rules.tiers.b.min <= rules.tiers.c.min) {
+    if (rules.tiers.tierB.min <= rules.tiers.tierC.min) {
       setError('Tier B minimum should be greater than Tier C minimum.')
       return
     }
 
     setSaving(true)
     try {
-      await settingsService.saveScoringRules(rules)
+      const saved = await scoringRulesService.saveScoringRules(rules)
+      setRules(saved)
       showToast('Scoring rules saved successfully.')
+    } catch (err) {
+      setError(err.message || 'Unable to save scoring rules.')
+      showToast(err.message || 'Unable to save scoring rules.', 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading || !rules) {
+  if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <LoadingSpinner size={32} />
+      </div>
+    )
+  }
+
+  if (!rules) {
+    return (
+      <div className="mx-auto w-full max-w-5xl">
+        <Breadcrumbs />
+        <PageHeader
+          title="Scoring Rules"
+          description="Configure lead qualification weights, tiers, and lifecycle stages."
+        />
+        {error && (
+          <div className="rounded-[var(--radius-md)] border border-[var(--status-error)] bg-[var(--status-error-bg)] px-4 py-3 text-sm text-[var(--status-error)]">
+            {error}
+          </div>
+        )}
       </div>
     )
   }
@@ -162,26 +196,26 @@ export default function ScoringRulesPage() {
             Define score thresholds for Tier A, B, and C.
           </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            {['a', 'b', 'c'].map((tier) => (
+            {TIER_FIELDS.map((tier) => (
               <div
-                key={tier}
+                key={tier.key}
                 className="rounded-[var(--radius-md)] border border-[var(--border-default)] p-4"
               >
                 <p className="mb-3 text-sm font-semibold uppercase tracking-wide">
-                  Tier {tier.toUpperCase()}
+                  Tier {tier.label}
                 </p>
                 <div className="space-y-3">
                   <Input
                     label="Min"
                     type="number"
-                    value={rules.tiers[tier].min}
-                    onChange={(e) => updateTier(tier, 'min', e.target.value)}
+                    value={rules.tiers[tier.key].min}
+                    onChange={(e) => updateTier(tier.key, 'min', e.target.value)}
                   />
                   <Input
                     label="Max"
                     type="number"
-                    value={rules.tiers[tier].max}
-                    onChange={(e) => updateTier(tier, 'max', e.target.value)}
+                    value={rules.tiers[tier.key].max}
+                    onChange={(e) => updateTier(tier.key, 'max', e.target.value)}
                   />
                 </div>
                 <div className="mt-3 h-2 rounded-full bg-[var(--bg-muted)]">
@@ -190,13 +224,13 @@ export default function ScoringRulesPage() {
                     style={{
                       width: `${Math.max(
                         8,
-                        rules.tiers[tier].max - rules.tiers[tier].min,
+                        rules.tiers[tier.key].max - rules.tiers[tier.key].min,
                       )}%`,
                     }}
                   />
                 </div>
                 <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                  {rules.tiers[tier].min}–{rules.tiers[tier].max}
+                  {rules.tiers[tier.key].min}–{rules.tiers[tier.key].max}
                 </p>
               </div>
             ))}
@@ -206,7 +240,7 @@ export default function ScoringRulesPage() {
         <Card>
           <h2 className="text-base font-semibold">Lead Lifecycle</h2>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Visual lifecycle used across AutoFlow lead processing.
+            Visual lifecycle used across Model 31 lead processing.
           </p>
           <div className="mt-5">
             <FunnelVisual

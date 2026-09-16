@@ -17,8 +17,7 @@ import { ROLES } from '../../data/roles'
 import Button from '../common/Button'
 import GlobalSearch from './GlobalSearch'
 import { cn } from '../../utils/cn'
-import notificationService from '../../services/mock/notificationService'
-import { initialMarketingNotifications } from '../../data/marketingNotifications'
+import notificationService from '../../services/api/notificationService'
 
 export default function TopHeader({ onMenuClick }) {
   const { user, logout } = useAuth()
@@ -43,28 +42,11 @@ export default function TopHeader({ onMenuClick }) {
 
   useEffect(() => {
     const t = window.setTimeout(async () => {
-      if (user?.role === ROLES.SUPER_ADMIN) {
+      try {
         const rows = await notificationService.getNotifications()
         setNotifications(rows.filter((n) => !n.read).slice(0, 5))
-      } else if (user?.role === ROLES.MARKETING_MANAGER) {
-        setNotifications(initialMarketingNotifications.slice(0, 5))
-      } else {
-        setNotifications([
-          {
-            id: 'local_1',
-            title: 'New qualified lead',
-            description: 'A lead is ready for review.',
-            date: 'Just now',
-            read: false,
-          },
-          {
-            id: 'local_2',
-            title: 'Appointment reminder',
-            description: 'Upcoming customer appointment today.',
-            date: '1 hour ago',
-            read: false,
-          },
-        ])
+      } catch {
+        setNotifications([])
       }
     }, 0)
     return () => window.clearTimeout(t)

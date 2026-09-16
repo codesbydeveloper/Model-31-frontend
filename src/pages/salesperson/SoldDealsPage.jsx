@@ -8,48 +8,63 @@ import DataTable from '../../components/common/DataTable'
 import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import Modal from '../../components/common/Modal'
+import { useToast } from '../../hooks/useToast'
 import { formatNumber } from '../../utils/table'
-import { getSoldDeals } from '../../services/mock/soldDealService'
-import commissionService from '../../services/mock/commissionService'
+import salespersonSoldDealService from '../../services/api/salespersonSoldDealService'
+
+const PAGE_SIZE = 10
 
 function money(value) {
   return `$${formatNumber(value)}`
 }
 
 export default function SoldDealsPage() {
+  const { showToast } = useToast()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
-  const [commissions, setCommissions] = useState([])
+  const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [detail, setDetail] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [deals, comms] = await Promise.all([
-        getSoldDeals('sp_001'),
-        commissionService.getCommissionRecords('sp_001', 'year'),
-      ])
-      setRows(deals)
-      setCommissions(comms)
+      const result = await salespersonSoldDealService.getSalespersonSoldDeals({
+        page,
+        limit: PAGE_SIZE,
+      })
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load sold deals.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
 
-  const withCommission = rows.map((deal) => {
-    const comm = commissions.find((c) => c.dealId === deal.id)
-    return {
-      ...deal,
-      commission: comm?.totalCommission || 0,
-      commissionStatus: comm?.status || 'PENDING',
-      commissionRecord: comm,
+  const openDeal = async (row) => {
+    setDetail(row)
+    setDetailLoading(true)
+    try {
+      const full = await salespersonSoldDealService.getSalespersonSoldDeal(row.id)
+      if (full) setDetail(full)
+    } catch (err) {
+      showToast(err.message || 'Unable to load deal details.', 'error')
+    } finally {
+      setDetailLoading(false)
     }
-  })
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl pb-20 md:pb-0">
@@ -89,7 +104,7 @@ export default function SoldDealsPage() {
                 label: 'Actions',
                 render: (row) => (
                   <div className="flex flex-wrap gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => setDetail(row)}>
+                    <Button size="sm" variant="ghost" onClick={() => openDeal(row)}>
                       View Deal
                     </Button>
                     {row.leadId && (
@@ -108,8 +123,12 @@ export default function SoldDealsPage() {
                 ),
               },
             ]}
-            rows={withCommission}
-            pageSize={10}
+            rows={rows}
+            page={page}
+            onPageChange={setPage}
+            pageSize={PAGE_SIZE}
+            totalItems={totalItems}
+            showPagination
             emptyTitle="No sold deals yet."
           />
         )}
@@ -120,7 +139,11 @@ export default function SoldDealsPage() {
         onClose={() => setDetail(null)}
         title="Sold Deal"
       >
-        {detail && (
+        {detailLoading && !detail?.customerName ? (
+          <div className="flex justify-center py-8">
+            <LoadingSpinner size={24} />
+          </div>
+        ) : detail ? (
           <div className="space-y-2 text-sm">
             <p>
               <strong>{detail.customerName}</strong>
@@ -130,6 +153,7 @@ export default function SoldDealsPage() {
             <p>Sale date: {detail.saleDate}</p>
             <p>Deal amount: {money(detail.salePrice)}</p>
             <p>Commission: {money(detail.commission)}</p>
+            {detail.paymentMethod && <p>Payment: {detail.paymentMethod}</p>}
             {detail.notes && <p className="text-[var(--text-secondary)]">{detail.notes}</p>}
             <div className="mt-4 flex justify-end">
               <Button variant="secondary" onClick={() => setDetail(null)}>
@@ -137,7 +161,7 @@ export default function SoldDealsPage() {
               </Button>
             </div>
           </div>
-        )}
+        ) : null}
       </Modal>
     </div>
   )

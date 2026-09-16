@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
@@ -8,41 +8,55 @@ import SearchInput from '../../components/common/SearchInput'
 import DataTable from '../../components/common/DataTable'
 import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
-import customerIdentityService from '../../services/mock/customerIdentityService'
+import { useToast } from '../../hooks/useToast'
+import { getCustomerIdentities } from '../../services/api/superAdminCustomerIdentityService'
+
+const PAGE_SIZE = 8
+const SEARCH_DEBOUNCE_MS = 400
 
 export default function CustomerIdentityPage() {
+  const { showToast } = useToast()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await customerIdentityService.getCustomerIdentity())
+      const result = await getCustomerIdentities({
+        page,
+        limit: PAGE_SIZE,
+        search: debouncedSearch,
+      })
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load customer identity.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, debouncedSearch, showToast])
 
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 0)
-    return () => window.clearTimeout(t)
-  }, [load])
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return rows.filter((r) => r.status !== 'MERGED')
-    return rows.filter(
-      (r) =>
-        r.status !== 'MERGED' &&
-        (r.name.toLowerCase().includes(q) ||
-          r.email.toLowerCase().includes(q) ||
-          r.phone.toLowerCase().includes(q) ||
-          r.leadIds.some((id) => id.toLowerCase().includes(q)) ||
-          r.crmId.toLowerCase().includes(q)),
-    )
-  }, [rows, search])
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
   return (
     <div className="mx-auto w-full max-w-7xl">
@@ -55,10 +69,7 @@ export default function CustomerIdentityPage() {
         <div className="mb-4">
           <SearchInput
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name, email, phone, lead ID, CRM ID..."
           />
         </div>
@@ -81,7 +92,7 @@ export default function CustomerIdentityPage() {
               {
                 key: 'channels',
                 label: 'Channels',
-                render: (row) => (row.channels || []).join(', '),
+                render: (row) => (row.channels || []).join(', ') || '—',
               },
               { key: 'dealership', label: 'Dealership' },
               { key: 'lastActivity', label: 'Last Activity' },
@@ -100,10 +111,12 @@ export default function CustomerIdentityPage() {
                 ),
               },
             ]}
-            rows={filtered}
+            rows={rows}
             page={page}
             onPageChange={setPage}
-            pageSize={8}
+            pageSize={PAGE_SIZE}
+            totalItems={totalItems}
+            showPagination
             emptyTitle="No customers found."
           />
         )}

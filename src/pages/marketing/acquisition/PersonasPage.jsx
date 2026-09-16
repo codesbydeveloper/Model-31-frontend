@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import PageHeader from '../../../components/layout/PageHeader'
@@ -18,15 +18,26 @@ import {
   PERSONA_TONES,
   PERSONA_LANGUAGES,
 } from '../../../data/personas'
-import { SOCIAL_PLATFORMS } from '../../../data/marketingContent'
-import personaService from '../../../services/mock/personaService'
+import {
+  getMarketingPersonas,
+  createMarketingPersona,
+} from '../../../services/api/marketingPersonaService'
+
+const PERSONA_PLATFORMS = [
+  'Facebook',
+  'Instagram',
+  'TikTok',
+  'YouTube',
+  'X',
+  'Whatnot',
+]
 
 const EMPTY_FORM = {
   name: '',
   description: '',
   targetAudience: '',
-  tone: PERSONA_TONES[1] || 'Friendly',
-  language: PERSONA_LANGUAGES[0],
+  tone: 'Friendly',
+  language: 'English',
   primaryPlatform: 'Instagram',
   status: 'ACTIVE',
 }
@@ -42,45 +53,51 @@ export default function PersonasPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
 
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await personaService.getPersonas())
+      setRows(
+        await getMarketingPersonas({
+          search: debouncedSearch,
+          status,
+        }),
+      )
+    } catch (err) {
+      setRows([])
+      showToast(err.message || 'Unable to load personas.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [debouncedSearch, status, showToast])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
 
-  const filtered = useMemo(() => {
-    let list = rows
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          (r.description || '').toLowerCase().includes(q) ||
-          (r.targetAudience || r.audience || '').toLowerCase().includes(q),
-      )
-    }
-    if (status !== 'all') list = list.filter((r) => r.status === status)
-    return list
-  }, [rows, search, status])
-
   const onCreate = async (e) => {
     e.preventDefault()
     setSaving(true)
     try {
-      const created = await personaService.createPersona(form)
+      const created = await createMarketingPersona(form)
       setCreateOpen(false)
       setForm(EMPTY_FORM)
       showToast('Persona created.')
       await load()
-      navigate(`/marketing/acquisition/personas/${created.id}`)
+      if (created?.id) {
+        navigate(`/marketing/acquisition/personas/${created.id}`)
+      }
+    } catch (err) {
+      showToast(err.message || 'Unable to create persona.', 'error')
     } finally {
       setSaving(false)
     }
@@ -118,8 +135,7 @@ export default function PersonasPage() {
             options={[
               { value: 'all', label: 'All statuses' },
               { value: 'ACTIVE', label: 'ACTIVE' },
-              { value: 'PAUSED', label: 'PAUSED' },
-              { value: 'DRAFT', label: 'DRAFT' },
+              { value: 'INACTIVE', label: 'INACTIVE' },
             ]}
           />
         </div>
@@ -128,7 +144,7 @@ export default function PersonasPage() {
           <div className="flex justify-center py-16">
             <LoadingSpinner size={28} />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : rows.length === 0 ? (
           <EmptyState
             title="No personas found."
             description="Create a persona to start targeting acquisition audiences."
@@ -137,7 +153,7 @@ export default function PersonasPage() {
           />
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((persona) => (
+            {rows.map((persona) => (
               <Link
                 key={persona.id}
                 to={`/marketing/acquisition/personas/${persona.id}`}
@@ -225,7 +241,7 @@ export default function PersonasPage() {
             label="Primary Platform"
             value={form.primaryPlatform}
             onChange={(e) => setForm({ ...form, primaryPlatform: e.target.value })}
-            options={SOCIAL_PLATFORMS.filter((p) => p !== 'WhatsApp').map((p) => ({
+            options={PERSONA_PLATFORMS.map((p) => ({
               value: p,
               label: p,
             }))}
@@ -236,8 +252,7 @@ export default function PersonasPage() {
             onChange={(e) => setForm({ ...form, status: e.target.value })}
             options={[
               { value: 'ACTIVE', label: 'ACTIVE' },
-              { value: 'DRAFT', label: 'DRAFT' },
-              { value: 'PAUSED', label: 'PAUSED' },
+              { value: 'INACTIVE', label: 'INACTIVE' },
             ]}
           />
           <div className="flex justify-end gap-2">

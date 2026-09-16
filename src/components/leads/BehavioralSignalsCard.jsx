@@ -17,7 +17,7 @@ export default function BehavioralSignalsCard({ signals = [] }) {
     <Card>
       <h2 className="text-base font-semibold">Behavioral Signals</h2>
       <p className="mt-1 text-sm text-[var(--text-secondary)]">
-        Legitimate mock engagement signals only. No covert tracking.
+        Current engagement signals for this lead.
       </p>
       <dl className="mt-4 space-y-2">
         <Row label="DM Opens" value={current.dmOpens} />

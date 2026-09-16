@@ -22,10 +22,12 @@ function toKey(date) {
 
 function formatTime(time) {
   if (!time) return ''
-  const [h, m] = time.split(':').map(Number)
+  if (/am|pm/i.test(String(time))) return String(time)
+  const [h, m] = String(time).split(':').map(Number)
+  if (!Number.isFinite(h)) return String(time)
   const period = h >= 12 ? 'PM' : 'AM'
   const hour = h % 12 || 12
-  return `${hour}:${String(m).padStart(2, '0')} ${period}`
+  return `${hour}:${String(m || 0).padStart(2, '0')} ${period}`
 }
 
 export default function AppointmentCalendar({
@@ -33,7 +35,7 @@ export default function AppointmentCalendar({
   mode = 'month',
   onModeChange,
 }) {
-  const [cursor, setCursor] = useState(new Date(2026, 7, 14))
+  const [cursor, setCursor] = useState(() => new Date())
 
   const byDate = useMemo(() => {
     const map = {}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
@@ -9,9 +9,7 @@ import StatCard from '../../components/common/StatCard'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import StatusBadge from '../../components/common/StatusBadge'
 import { formatNumber, formatPercent } from '../../utils/table'
-import dealershipService from '../../services/mock/dealershipService'
-import { mockLeads } from '../../data/leads'
-import { initialPlatformUsers } from '../../data/platformUsers'
+import dealershipService from '../../services/api/dealershipService'
 
 const TABS = [
   'Overview',
@@ -29,36 +27,34 @@ export default function DealershipDetailPage() {
   const [dealership, setDealership] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('Overview')
+  const [salespeople, setSalespeople] = useState([])
+  const [leads, setLeads] = useState([])
 
   useEffect(() => {
     let active = true
     ;(async () => {
       setLoading(true)
-      const data = await dealershipService.getDealershipById(id)
-      if (active) {
-        setDealership(data)
-        setLoading(false)
+      try {
+        const data = await dealershipService.getDealershipById(id)
+        if (active) setDealership(data)
+        const [staff, leadRows] = await Promise.all([
+          dealershipService.getDealershipStaff(id).catch(() => []),
+          dealershipService.getDealershipLeadList(id).catch(() => []),
+        ])
+        if (active) {
+          setSalespeople(staff)
+          setLeads(leadRows)
+        }
+      } catch {
+        if (active) setDealership(null)
+      } finally {
+        if (active) setLoading(false)
       }
     })()
     return () => {
       active = false
     }
   }, [id])
-
-  const salespeople = useMemo(
-    () =>
-      initialPlatformUsers.filter(
-        (u) =>
-          u.dealership === dealership?.name &&
-          (u.role === 'Salesperson' || u.role === 'BDC Manager'),
-      ),
-    [dealership],
-  )
-
-  const leads = useMemo(
-    () => mockLeads.filter((l) => l.dealershipId === id),
-    [id],
-  )
 
   if (loading) {
     return (
@@ -74,7 +70,7 @@ export default function DealershipDetailPage() {
         <Card>
           <h1 className="text-xl font-semibold">Dealership not found</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            The dealership you requested does not exist in mock data.
+            The dealership you requested could not be loaded.
           </p>
           <Link to="/super-admin/dealerships" className="mt-4 inline-block">
             <Button variant="secondary">
@@ -149,7 +145,7 @@ export default function DealershipDetailPage() {
             <Info label="Phone" value={dealership.phone} />
             <Info label="Website" value={dealership.website} />
             <Info label="Timezone" value={dealership.timezone} />
-            <Info label="Brands" value={dealership.brands.join(', ')} />
+            <Info label="Brands" value={(dealership.brands || []).join(', ')} />
             <Info label="ZIP" value={dealership.zip} />
             <Info label="CRM Status" value={dealership.crmStatus} />
             <Info label="Social Status" value={dealership.socialStatus} />
@@ -157,8 +153,8 @@ export default function DealershipDetailPage() {
         )}
 
         {tab === 'Salespeople' && (
-          <MockList
-            empty="No salespeople assigned in mock data."
+          <ItemList
+            empty="No salespeople assigned to this dealership."
             items={salespeople.map((u) => ({
               title: u.name,
               meta: `${u.role} · ${u.status}`,
@@ -167,8 +163,8 @@ export default function DealershipDetailPage() {
         )}
 
         {tab === 'Leads' && (
-          <MockList
-            empty="No lead samples for this dealership."
+          <ItemList
+            empty="No leads for this dealership."
             items={leads.map((l) => ({
               title: `${l.id} · ${l.name}`,
               meta: `${l.source} · Score ${l.score} · ${l.status}`,
@@ -178,8 +174,7 @@ export default function DealershipDetailPage() {
 
         {tab === 'Conversations' && (
           <p className="text-sm text-[var(--text-secondary)]">
-            Conversation history will be connected in a later step. Mock summary:
-            128 active threads, 92% AI-assisted first response.
+            Open Conversations from the dealership menu to view live threads for this rooftop.
           </p>
         )}
 
@@ -189,8 +184,7 @@ export default function DealershipDetailPage() {
               CRM Status: <StatusBadge status={dealership.crmStatus} />
             </p>
             <p className="text-[var(--text-secondary)]">
-              Last mock sync completed successfully. Full CRM mapping arrives in a
-              later integration step.
+              CRM connection status for this dealership.
             </p>
           </div>
         )}
@@ -209,15 +203,14 @@ export default function DealershipDetailPage() {
 
         {tab === 'Settings' && (
           <p className="text-sm text-[var(--text-secondary)]">
-            Dealership-level settings placeholders: timezone ({dealership.timezone}),
-            status ({dealership.status}), and brand inventory preferences.
+            Dealership timezone is {dealership.timezone}. Status is {dealership.status}.
+            Brand and inventory preferences are managed in Dealership Settings.
           </p>
         )}
 
         {tab === 'Reports' && (
           <p className="text-sm text-[var(--text-secondary)]">
-            Reporting workspace placeholder. Conversion currently{' '}
-            {formatPercent(dealership.conversionRate)} with{' '}
+            Conversion is currently {formatPercent(dealership.conversionRate)} with{' '}
             {formatNumber(dealership.closedDeals)} closed deals.
           </p>
         )}
@@ -237,7 +230,7 @@ function Info({ label, value }) {
   )
 }
 
-function MockList({ items, empty }) {
+function ItemList({ items, empty }) {
   if (!items.length) {
     return <p className="text-sm text-[var(--text-secondary)]">{empty}</p>
   }

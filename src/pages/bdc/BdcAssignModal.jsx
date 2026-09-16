@@ -3,7 +3,8 @@ import Modal from '../../components/common/Modal'
 import Button from '../../components/common/Button'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import StatusBadge from '../../components/common/StatusBadge'
-import bdcService from '../../services/mock/bdcService'
+import { useToast } from '../../hooks/useToast'
+import bdcLeadService from '../../services/api/bdcLeadService'
 
 export default function BdcAssignModal({
   open,
@@ -25,6 +26,7 @@ export default function BdcAssignModal({
 }
 
 function AssignForm({ lead, mode, onClose, onDone }) {
+  const { showToast } = useToast()
   const [people, setPeople] = useState([])
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -33,28 +35,36 @@ function AssignForm({ lead, mode, onClose, onDone }) {
   useEffect(() => {
     let active = true
     const timer = window.setTimeout(async () => {
-      const rows = await bdcService.getSalespeopleAvailability()
-      if (active) {
-        setPeople(rows)
-        setLoading(false)
+      try {
+        const rows = await bdcLeadService.getBdcSalespeople()
+        if (active) setPeople(rows)
+      } catch (err) {
+        if (active) {
+          setPeople([])
+          showToast(err.message || 'Unable to load salespeople.', 'error')
+        }
+      } finally {
+        if (active) setLoading(false)
       }
     }, 0)
     return () => {
       active = false
       window.clearTimeout(timer)
     }
-  }, [])
+  }, [showToast])
 
   const submit = async () => {
     if (!selected) return
     setSaving(true)
     try {
       if (mode === 'reassign') {
-        await bdcService.reassignLead(lead.id, selected)
+        await bdcLeadService.reassignBdcLead(lead.id, selected.id)
       } else {
-        await bdcService.assignLead(lead.id, selected)
+        await bdcLeadService.assignBdcLead(lead.id, selected.id)
       }
       await onDone?.(selected)
+    } catch (err) {
+      showToast(err.message || 'Unable to assign lead.', 'error')
     } finally {
       setSaving(false)
     }
@@ -102,7 +112,7 @@ function AssignForm({ lead, mode, onClose, onDone }) {
               <div>
                 <p className="text-sm font-semibold">{person.name}</p>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  {person.dealership} · {person.currentLeads} active leads
+                  {person.dealership || 'Dealership'} · {person.currentLeads} active leads
                 </p>
               </div>
               <StatusBadge status={person.status} />

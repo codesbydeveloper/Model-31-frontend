@@ -4,11 +4,10 @@ import Button from '../../../components/common/Button'
 import Input from '../../../components/common/Input'
 import Select from '../../../components/common/Select'
 import LoadingSpinner from '../../../components/common/LoadingSpinner'
-import {
-  APPOINTMENT_TYPES,
-} from '../../../data/appointments'
-import appointmentService from '../../../services/mock/appointmentService'
-import salespersonService from '../../../services/mock/salespersonService'
+import { APPOINTMENT_TYPES } from '../../../data/appointments'
+import { useToast } from '../../../hooks/useToast'
+import { getMyLeads } from '../../../services/api/salespersonPortalService'
+import { createSalespersonAppointment } from '../../../services/api/salespersonAppointmentService'
 
 export default function CreateAppointmentModal({ open, onClose, onCreated, defaults = {} }) {
   if (!open) return null
@@ -23,32 +22,35 @@ export default function CreateAppointmentModal({ open, onClose, onCreated, defau
 }
 
 function CreateForm({ defaults, onClose, onCreated }) {
+  const { showToast } = useToast()
   const [leads, setLeads] = useState([])
   const [saving, setSaving] = useState(false)
+  const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
     customerName: defaults.customerName || '',
     leadId: defaults.leadId || '',
     vehicle: defaults.vehicle || '',
     type: defaults.type || 'Test Drive',
-    date: defaults.date || '2026-08-16',
+    date: defaults.date || today,
     time: defaults.time || '10:00',
-    dealership: defaults.dealership || 'Miami Luxury Motors',
     notes: defaults.notes || '',
-    phone: defaults.phone || '',
-    email: defaults.email || '',
   })
 
   useEffect(() => {
     let active = true
     const t = window.setTimeout(async () => {
-      const rows = await salespersonService.getMyLeads('sp_001')
-      if (active) setLeads(rows)
+      try {
+        const result = await getMyLeads({ page: 1, limit: 10 })
+        if (active) setLeads(result.items)
+      } catch (err) {
+        if (active) showToast(err.message || 'Unable to load leads.', 'error')
+      }
     }, 0)
     return () => {
       active = false
       window.clearTimeout(t)
     }
-  }, [])
+  }, [showToast])
 
   const onLeadChange = (leadId) => {
     const lead = leads.find((l) => l.id === leadId)
@@ -57,9 +59,6 @@ function CreateForm({ defaults, onClose, onCreated }) {
       leadId,
       customerName: lead?.customerName || prev.customerName,
       vehicle: lead?.vehicle || prev.vehicle,
-      phone: lead?.phone || prev.phone,
-      email: lead?.email || prev.email,
-      dealership: lead?.dealership || prev.dealership,
     }))
   }
 
@@ -67,12 +66,10 @@ function CreateForm({ defaults, onClose, onCreated }) {
     e.preventDefault()
     setSaving(true)
     try {
-      const created = await appointmentService.createAppointment({
-        ...form,
-        salesperson: 'John Smith',
-        salespersonId: 'sp_001',
-      })
+      const created = await createSalespersonAppointment(form)
       await onCreated?.(created)
+    } catch (err) {
+      showToast(err.message || 'Unable to schedule appointment.', 'error')
     } finally {
       setSaving(false)
     }
@@ -113,11 +110,6 @@ function CreateForm({ defaults, onClose, onCreated }) {
           value={form.type}
           onChange={(e) => setForm({ ...form, type: e.target.value })}
           options={APPOINTMENT_TYPES}
-        />
-        <Input
-          label="Dealership"
-          value={form.dealership}
-          onChange={(e) => setForm({ ...form, dealership: e.target.value })}
         />
         <Input
           label="Date"

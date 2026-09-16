@@ -7,25 +7,38 @@ import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import DataTable from '../../components/common/DataTable'
 import { useToast } from '../../hooks/useToast'
-import bdcService from '../../services/mock/bdcService'
+import bdcLeadService from '../../services/api/bdcLeadService'
 import BdcAssignModal from './BdcAssignModal'
 import PipelineBadge from '../../components/common/PipelineBadge'
+
+const PAGE_SIZE = 10
 
 export default function BdcQueuePage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [active, setActive] = useState(null)
   const [assignOpen, setAssignOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await bdcService.getQueue())
+      const result = await bdcLeadService.getBdcQueue({ page, limit: PAGE_SIZE })
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load queue.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -98,7 +111,11 @@ export default function BdcQueuePage() {
           <DataTable
             columns={columns}
             rows={rows}
-            pageSize={10}
+            page={page}
+            pageSize={PAGE_SIZE}
+            totalItems={totalItems}
+            showPagination
+            onPageChange={setPage}
             emptyTitle="No leads waiting."
             emptyDescription="All qualified leads have been assigned."
           />

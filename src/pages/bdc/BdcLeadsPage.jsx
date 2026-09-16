@@ -1,18 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
+import Input from '../../components/common/Input'
+import Select from '../../components/common/Select'
+import Modal from '../../components/common/Modal'
 import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import DataTable from '../../components/common/DataTable'
 import { useToast } from '../../hooks/useToast'
-import bdcService from '../../services/mock/bdcService'
+import bdcLeadService from '../../services/api/bdcLeadService'
 import BdcAssignModal from './BdcAssignModal'
 import PipelineBadge from '../../components/common/PipelineBadge'
 
 const TABS = ['All', 'Qualified', 'Assigned', 'Accepted', 'Expired', 'Escalated']
+const PAGE_SIZE = 10
 
 export default function BdcLeadsPage() {
   const { showToast } = useToast()
@@ -20,28 +24,43 @@ export default function BdcLeadsPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('All')
   const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [active, setActive] = useState(null)
   const [mode, setMode] = useState('assign')
   const [modalOpen, setModalOpen] = useState(false)
+  const [escalateLead, setEscalateLead] = useState(null)
+  const [escalateForm, setEscalateForm] = useState({
+    reason: 'No response',
+    priority: 'HIGH',
+  })
+  const [escalating, setEscalating] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await bdcService.getBdcLeads())
+      const result = await bdcLeadService.getBdcLeads({
+        page,
+        limit: PAGE_SIZE,
+        status: tab === 'All' ? '' : tab.toUpperCase(),
+      })
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load leads.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, tab, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
-
-  const filtered = useMemo(() => {
-    if (tab === 'All') return rows
-    return rows.filter((row) => row.bdcStatus === tab.toUpperCase() || row.status === tab.toUpperCase())
-  }, [rows, tab])
 
   const openAssign = (lead, nextMode) => {
     setActive(lead)
@@ -49,10 +68,19 @@ export default function BdcLeadsPage() {
     setModalOpen(true)
   }
 
-  const escalate = async (lead) => {
-    await bdcService.escalateLead(lead.id)
-    showToast('Lead escalated.')
-    await load()
+  const submitEscalate = async () => {
+    if (!escalateLead) return
+    setEscalating(true)
+    try {
+      await bdcLeadService.escalateBdcLead(escalateLead.id, escalateForm)
+      showToast('Lead escalated.')
+      setEscalateLead(null)
+      await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to escalate lead.', 'error')
+    } finally {
+      setEscalating(false)
+    }
   }
 
   const columns = [
@@ -106,7 +134,14 @@ export default function BdcLeadsPage() {
           <Button size="sm" variant="ghost" onClick={() => openAssign(row, 'reassign')}>
             Reassign
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => escalate(row)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setEscalateForm({ reason: 'No response', priority: 'HIGH' })
+              setEscalateLead(row)
+            }}
+          >
             Escalate
           </Button>
         </div>
@@ -153,10 +188,12 @@ export default function BdcLeadsPage() {
         ) : (
           <DataTable
             columns={columns}
-            rows={filtered}
+            rows={rows}
             page={page}
             onPageChange={setPage}
-            pageSize={10}
+            pageSize={PAGE_SIZE}
+            totalItems={totalItems}
+            showPagination
             emptyTitle="No leads in this tab."
           />
         )}
@@ -177,6 +214,33 @@ export default function BdcLeadsPage() {
           await load()
         }}
       />
+
+      <Modal
+        open={Boolean(escalateLead)}
+        onClose={() => !escalating && setEscalateLead(null)}
+        title="Escalate Lead"
+      >
+        <Input
+          label="Reason"
+          value={escalateForm.reason}
+          onChange={(e) => setEscalateForm({ ...escalateForm, reason: e.target.value })}
+        />
+        <Select
+          label="Priority"
+          value={escalateForm.priority}
+          onChange={(e) => setEscalateForm({ ...escalateForm, priority: e.target.value })}
+          options={['HIGH', 'MEDIUM', 'LOW']}
+          containerClassName="mt-3"
+        />
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="secondary" disabled={escalating} onClick={() => setEscalateLead(null)}>
+            Cancel
+          </Button>
+          <Button disabled={escalating || !escalateForm.reason.trim()} onClick={submitEscalate}>
+            {escalating ? <LoadingSpinner size={16} /> : 'Escalate'}
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

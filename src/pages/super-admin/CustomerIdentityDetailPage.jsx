@@ -9,65 +9,77 @@ import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import Modal from '../../components/common/Modal'
 import { useToast } from '../../hooks/useToast'
-import customerIdentityService from '../../services/mock/customerIdentityService'
-import leadService from '../../services/mock/leadService'
 import PipelineBadge from '../../components/common/PipelineBadge'
-import { PIPELINE_TYPES, classifyLead } from '../../utils/pipeline'
+import { PIPELINE_TYPES } from '../../utils/pipeline'
 import BuyerGenomeCard from '../../components/leads/BuyerGenomeCard'
 import BehavioralSignalsCard from '../../components/leads/BehavioralSignalsCard'
-import buyerGenomeService from '../../services/mock/buyerGenomeService'
+import {
+  getCustomerIdentityById,
+  getDuplicateReview,
+  mergeCustomerRecords,
+} from '../../services/api/superAdminCustomerIdentityService'
 
 export default function CustomerIdentityDetailPage() {
   const { id } = useParams()
   const { showToast } = useToast()
   const [customer, setCustomer] = useState(null)
-  const [linkedLeads, setLinkedLeads] = useState([])
-  const [genome, setGenome] = useState(null)
-  const [signals, setSignals] = useState([])
-  const [duplicates, setDuplicates] = useState([])
   const [compare, setCompare] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [reviewLoading, setReviewLoading] = useState(false)
   const [merging, setMerging] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await customerIdentityService.getCustomerById(id)
-      setCustomer(data)
-      if (data?.leadIds?.length) {
-        const leads = await Promise.all(
-          data.leadIds.map((leadId) => leadService.getLeadById(leadId)),
-        )
-        setLinkedLeads(leads.filter(Boolean).map((lead) => classifyLead(lead)))
-        const firstId = data.leadIds[0]
-        const [g, s] = await Promise.all([
-          buyerGenomeService.getBuyerGenome(firstId),
-          buyerGenomeService.getBehaviorSignals(firstId),
-        ])
-        setGenome(g)
-        setSignals(s)
-      } else {
-        setLinkedLeads([])
-        setGenome(null)
-        setSignals([])
-      }
-      if (data?.potentialDuplicates?.length) {
-        const all = await customerIdentityService.getCustomerIdentity()
-        setDuplicates(
-          all.filter((c) => data.potentialDuplicates.includes(c.id) && c.status !== 'MERGED'),
-        )
-      } else {
-        setDuplicates([])
-      }
+      setCustomer(await getCustomerIdentityById(id))
+    } catch (err) {
+      setCustomer(null)
+      showToast(err.message || 'Unable to load customer.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
+
+  const openDuplicateReview = async (duplicate) => {
+    setReviewLoading(true)
+    try {
+      const review = await getDuplicateReview(customer.id)
+      const match =
+        review.duplicates.find((item) => item.id === duplicate.id) ||
+        (review.duplicate?.id === duplicate.id ? review.duplicate : null) ||
+        review.duplicate ||
+        duplicate
+      setCompare({
+        current: review.current || customer,
+        other: match,
+      })
+    } catch (err) {
+      showToast(err.message || 'Unable to load duplicate review.', 'error')
+      setCompare({ current: customer, other: duplicate })
+    } finally {
+      setReviewLoading(false)
+    }
+  }
+
+  const mergeRecords = async () => {
+    if (!customer?.id || !compare?.other?.id) return
+    setMerging(true)
+    try {
+      await mergeCustomerRecords(customer.id, compare.other.id)
+      showToast('Records merged successfully.')
+      setCompare(null)
+      await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to merge records.', 'error')
+    } finally {
+      setMerging(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -87,6 +99,10 @@ export default function CustomerIdentityDetailPage() {
       </Card>
     )
   }
+
+  const linkedLeads = customer.linkedLeads || []
+  const duplicates = customer.potentialDuplicates || []
+  const timeline = customer.timeline || []
 
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -119,7 +135,7 @@ export default function CustomerIdentityDetailPage() {
                       <PipelineBadge pipelineType={lead.pipelineType} />
                     </dd>
                   </div>
-                  <Row label="Lead Source" value={lead.source} />
+                  <Row label="Lead Source" value={lead.source || '—'} />
                   <Row label="Lead ID" value={lead.id} />
                   <Row
                     label={isModel31 ? 'Model 31 Signature' : 'Model 31 Status'}
@@ -132,10 +148,10 @@ export default function CustomerIdentityDetailPage() {
         </div>
       )}
 
-      {(genome || signals.length > 0) && (
+      {(customer.genome || (customer.signals || []).length > 0) && (
         <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <BuyerGenomeCard genome={genome} />
-          <BehavioralSignalsCard signals={signals} />
+          <BuyerGenomeCard genome={customer.genome} />
+          <BehavioralSignalsCard signals={customer.signals} />
         </div>
       )}
 
@@ -152,21 +168,25 @@ export default function CustomerIdentityDetailPage() {
         <Card>
           <h2 className="mb-3 text-base font-semibold">Identifiers</h2>
           <dl className="space-y-2 text-sm">
-            <Row label="AutoFlow Customer ID" value={customer.autoFlowId} />
+            <Row label="Model 31 Customer ID" value={customer.autoFlowId} />
             <Row label="CRM ID" value={customer.crmId} />
-            <Row label="Lead IDs" value={(customer.leadIds || []).join(', ')} />
+            <Row label="Lead IDs" value={(customer.leadIds || []).join(', ') || '—'} />
           </dl>
           <div className="mt-4">
             <p className="mb-2 text-sm font-semibold">Channels</p>
             <div className="flex flex-wrap gap-2">
-              {(customer.channels || []).map((ch) => (
-                <span
-                  key={ch}
-                  className="rounded-full bg-[var(--bg-muted)] px-2.5 py-1 text-xs font-medium"
-                >
-                  {ch}
-                </span>
-              ))}
+              {(customer.channels || []).length === 0 ? (
+                <span className="text-sm text-[var(--text-secondary)]">—</span>
+              ) : (
+                customer.channels.map((ch) => (
+                  <span
+                    key={ch}
+                    className="rounded-full bg-[var(--bg-muted)] px-2.5 py-1 text-xs font-medium"
+                  >
+                    {ch}
+                  </span>
+                ))
+              )}
             </div>
           </div>
         </Card>
@@ -186,8 +206,8 @@ export default function CustomerIdentityDetailPage() {
                   <p className="text-sm text-[var(--text-secondary)]">{dup.email}</p>
                   <p className="text-sm text-[var(--text-secondary)]">{dup.phone}</p>
                 </div>
-                <Button size="sm" onClick={() => setCompare(dup)}>
-                  Review Duplicate
+                <Button size="sm" disabled={reviewLoading} onClick={() => openDuplicateReview(dup)}>
+                  {reviewLoading ? <LoadingSpinner size={16} /> : 'Review Duplicate'}
                 </Button>
               </div>
             ))}
@@ -197,50 +217,41 @@ export default function CustomerIdentityDetailPage() {
 
       <Card className="mt-4">
         <h2 className="mb-3 text-base font-semibold">Unified Timeline</h2>
-        <ul className="space-y-2">
-          {(customer.timeline || []).map((item) => (
-            <li
-              key={item.id}
-              className="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-2 text-sm"
-            >
-              <p className="font-medium">{item.event}</p>
-              <p className="text-[var(--text-secondary)]">{item.detail}</p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">{item.time}</p>
-            </li>
-          ))}
-        </ul>
+        {timeline.length === 0 ? (
+          <p className="text-sm text-[var(--text-secondary)]">No timeline events yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {timeline.map((item) => (
+              <li
+                key={item.id}
+                className="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-2 text-sm"
+              >
+                <p className="font-medium">{item.event}</p>
+                <p className="text-[var(--text-secondary)]">{item.detail}</p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">{item.time}</p>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       <Modal
         open={Boolean(compare)}
-        onClose={() => setCompare(null)}
+        onClose={() => !merging && setCompare(null)}
         title="Review Duplicate"
         className="max-w-3xl"
       >
         {compare && (
           <div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <CompareCard title="Customer A" customer={customer} />
-              <CompareCard title="Customer B" customer={compare} />
+              <CompareCard title="Customer A" customer={compare.current} />
+              <CompareCard title="Customer B" customer={compare.other} />
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setCompare(null)}>
+              <Button variant="secondary" disabled={merging} onClick={() => setCompare(null)}>
                 Cancel
               </Button>
-              <Button
-                disabled={merging}
-                onClick={async () => {
-                  setMerging(true)
-                  try {
-                    await customerIdentityService.mergeCustomerRecords(customer.id, compare.id)
-                    showToast('Records merged successfully.')
-                    setCompare(null)
-                    await load()
-                  } finally {
-                    setMerging(false)
-                  }
-                }}
-              >
+              <Button disabled={merging} onClick={() => void mergeRecords()}>
                 {merging ? <LoadingSpinner size={16} /> : 'Merge Records'}
               </Button>
             </div>
@@ -261,6 +272,14 @@ function Row({ label, value }) {
 }
 
 function CompareCard({ title, customer }) {
+  if (!customer) {
+    return (
+      <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] p-3 text-sm">
+        <p className="mb-2 font-semibold">{title}</p>
+        <p className="text-[var(--text-secondary)]">No customer data.</p>
+      </div>
+    )
+  }
   return (
     <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] p-3 text-sm">
       <p className="mb-2 font-semibold">{title}</p>

@@ -31,7 +31,7 @@ export const initialMarketingNotifications = [
     id: 'mn_005',
     type: 'social',
     title: 'Social account disconnected',
-    message: 'X (@AutoFlowAuto) is disconnected.',
+    message: 'X (@Model31Auto) is disconnected.',
     time: 'Yesterday',
   },
   {

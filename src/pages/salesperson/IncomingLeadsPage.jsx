@@ -9,10 +9,13 @@ import ConfirmModal from '../../components/common/ConfirmModal'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { useToast } from '../../hooks/useToast'
-import dispatchService from '../../services/mock/dispatchService'
-import salespersonService from '../../services/mock/salespersonService'
 import PipelineBadge from '../../components/common/PipelineBadge'
 import { classifyLead, PIPELINE_TYPES } from '../../utils/pipeline'
+import {
+  acceptIncomingLead,
+  declineIncomingLead,
+  getIncomingLeads,
+} from '../../services/api/salespersonPortalService'
 
 function formatCountdown(totalSeconds) {
   const safe = Math.max(0, totalSeconds)
@@ -26,7 +29,7 @@ export default function IncomingLeadsPage() {
   const { showToast } = useToast()
   const [offers, setOffers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [secondsLeft, setSecondsLeft] = useState(299)
+  const [secondsLeft, setSecondsLeft] = useState(0)
   const [busy, setBusy] = useState(false)
   const [declineOpen, setDeclineOpen] = useState(false)
   const [expired, setExpired] = useState(false)
@@ -34,14 +37,17 @@ export default function IncomingLeadsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const rows = await dispatchService.getIncomingOffers('sp_001')
+      const rows = await getIncomingLeads()
       setOffers(rows)
-      setSecondsLeft(rows[0]?.expiresIn ?? 299)
+      setSecondsLeft(rows[0]?.expiresIn || 0)
       setExpired(false)
+    } catch (err) {
+      setOffers([])
+      showToast(err.message || 'Unable to load incoming leads.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -52,7 +58,7 @@ export default function IncomingLeadsPage() {
   const classified = current ? classifyLead(current) : null
 
   useEffect(() => {
-    if (!current || expired || busy) return undefined
+    if (!current || expired || busy || !current.expiresIn) return undefined
     const timer = window.setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
@@ -66,23 +72,20 @@ export default function IncomingLeadsPage() {
   }, [current, expired, busy])
 
   useEffect(() => {
-    if (secondsLeft !== 0 || !current || expired) return
-    ;(async () => {
-      setExpired(true)
-      await dispatchService.expireOffer(current.id)
-      showToast('Lead offer expired.', 'error')
-      await load()
-    })()
-  }, [secondsLeft, current, expired, showToast, load])
+    if (secondsLeft !== 0 || !current || expired || !current.expiresIn) return
+    setExpired(true)
+    showToast('Lead offer expired.', 'error')
+  }, [secondsLeft, current, expired, showToast])
 
   const accept = async () => {
     if (!current) return
     setBusy(true)
     try {
-      await dispatchService.acceptOffer(current.id)
-      await salespersonService.acceptIncomingLead(current.id, current)
+      await acceptIncomingLead(current.id)
       showToast('Lead accepted.')
       navigate(`/salesperson/leads/${current.id}`)
+    } catch (err) {
+      showToast(err.message || 'Unable to accept lead.', 'error')
     } finally {
       setBusy(false)
     }
@@ -92,11 +95,12 @@ export default function IncomingLeadsPage() {
     if (!current) return
     setBusy(true)
     try {
-      await dispatchService.declineOffer(current.id)
-      await salespersonService.declineIncomingLead(current.id)
+      await declineIncomingLead(current.id)
       showToast('Lead declined and sent to the next available salesperson.')
       setDeclineOpen(false)
       await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to decline lead.', 'error')
     } finally {
       setBusy(false)
     }
@@ -143,10 +147,16 @@ export default function IncomingLeadsPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.14em]">
             New Qualified Lead
           </p>
-          <p className="mt-3 text-4xl font-semibold tabular-nums">
-            {formatCountdown(secondsLeft)}
-          </p>
-          <p className="mt-1 text-sm text-white/80">Time remaining</p>
+          {current.expiresIn > 0 ? (
+            <>
+              <p className="mt-3 text-4xl font-semibold tabular-nums">
+                {formatCountdown(secondsLeft)}
+              </p>
+              <p className="mt-1 text-sm text-white/80">Time remaining</p>
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-white/80">Accept or decline this lead.</p>
+          )}
         </div>
 
         <div className="space-y-4 px-5 py-5">
@@ -185,7 +195,7 @@ export default function IncomingLeadsPage() {
             />
           </dl>
 
-          {expired || secondsLeft === 0 ? (
+          {expired ? (
             <div className="rounded-[var(--radius-md)] border border-[var(--status-error)] bg-[var(--status-error-bg)] px-4 py-3 text-sm text-[var(--status-error)]">
               Lead offer expired. Lead sent to next available salesperson.
             </div>
@@ -229,7 +239,7 @@ function Row({ label, value }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-[var(--border-default)] py-2 last:border-0">
       <dt className="text-[var(--text-secondary)]">{label}</dt>
-      <dd className="font-medium text-[var(--text-primary)]">{value}</dd>
+      <dd className="font-medium text-[var(--text-primary)]">{value || '—'}</dd>
     </div>
   )
 }

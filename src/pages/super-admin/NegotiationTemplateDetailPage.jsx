@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, Trash2 } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
@@ -9,29 +9,48 @@ import Input from '../../components/common/Input'
 import Select from '../../components/common/Select'
 import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
+import ConfirmModal from '../../components/common/ConfirmModal'
 import { useToast } from '../../hooks/useToast'
-import negotiationService from '../../services/mock/negotiationService'
+import negotiationTemplateService from '../../services/api/negotiationTemplateService'
 
 export default function NegotiationTemplateDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { showToast } = useToast()
   const [item, setItem] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setItem(await negotiationService.getNegotiationTemplate(id))
+      setItem(await negotiationTemplateService.getNegotiationTemplate(id))
+    } catch (err) {
+      setItem(null)
+      showToast(err.message || 'Unable to load template.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
+
+  const confirmDelete = async () => {
+    setDeleteLoading(true)
+    try {
+      await negotiationTemplateService.deleteNegotiationTemplate(id)
+      showToast('Template deleted successfully.')
+      navigate('/super-admin/negotiation-templates')
+    } catch (err) {
+      showToast(err.message || 'Unable to delete template.', 'error')
+      setDeleteLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -68,7 +87,15 @@ export default function NegotiationTemplateDetailPage() {
       <PageHeader
         title={item.name}
         description={item.description}
-        actions={<StatusBadge status={item.status} />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={item.status} />
+            <Button variant="secondary" size="sm" onClick={() => setDeleting(true)}>
+              <Trash2 size={14} />
+              Delete
+            </Button>
+          </div>
+        }
       />
       <Card>
         <form
@@ -77,16 +104,28 @@ export default function NegotiationTemplateDetailPage() {
             e.preventDefault()
             setSaving(true)
             try {
-              const saved = await negotiationService.updateNegotiationTemplate(id, item)
+              const saved = await negotiationTemplateService.updateNegotiationTemplate(id, item)
               setItem(saved)
-              showToast('Template saved (mock).')
+              showToast('Template saved successfully.')
+            } catch (err) {
+              showToast(err.message || 'Unable to save template.', 'error')
             } finally {
               setSaving(false)
             }
           }}
         >
-          <Input label="Template Name" value={item.name} onChange={(e) => update('name', e.target.value)} containerClassName="sm:col-span-2" />
-          <Input label="Description" value={item.description} onChange={(e) => update('description', e.target.value)} containerClassName="sm:col-span-2" />
+          <Input
+            label="Template Name"
+            value={item.name}
+            onChange={(e) => update('name', e.target.value)}
+            containerClassName="sm:col-span-2"
+          />
+          <Input
+            label="Description"
+            value={item.description}
+            onChange={(e) => update('description', e.target.value)}
+            containerClassName="sm:col-span-2"
+          />
           <Select
             label="Vehicle Type"
             value={item.vehicleType}
@@ -99,10 +138,38 @@ export default function NegotiationTemplateDetailPage() {
             onChange={(e) => update('status', e.target.value)}
             options={['ACTIVE', 'INACTIVE']}
           />
-          <Input label="Minimum Price Rule" value={item.minPriceRule} onChange={(e) => update('minPriceRule', e.target.value)} />
-          <Input label="Maximum Discount Rule" value={item.maxDiscountRule} onChange={(e) => update('maxDiscountRule', e.target.value)} />
-          <Input label="Payment Range" value={item.paymentRange} onChange={(e) => update('paymentRange', e.target.value)} />
-          <Input label="Trade Range" value={item.tradeRange} onChange={(e) => update('tradeRange', e.target.value)} />
+          <Input
+            label="Minimum Price Rule"
+            value={item.minPriceRule}
+            onChange={(e) => update('minPriceRule', e.target.value)}
+          />
+          <Input
+            label="Maximum Discount Rule"
+            value={item.maxDiscountRule}
+            onChange={(e) => update('maxDiscountRule', e.target.value)}
+          />
+          <Input
+            label="Payment Range"
+            value={item.paymentRange}
+            onChange={(e) => update('paymentRange', e.target.value)}
+          />
+          <Input
+            label="Trade Range"
+            value={item.tradeRange}
+            onChange={(e) => update('tradeRange', e.target.value)}
+          />
+          <Input
+            label="Allowed Incentives"
+            value={item.allowedIncentives}
+            onChange={(e) => update('allowedIncentives', e.target.value)}
+            containerClassName="sm:col-span-2"
+          />
+          <Input
+            label="Allowed Fees"
+            value={item.allowedFees}
+            onChange={(e) => update('allowedFees', e.target.value)}
+            containerClassName="sm:col-span-2"
+          />
           <div className="sm:col-span-2">
             <Button type="submit" disabled={saving}>
               {saving ? <LoadingSpinner size={16} /> : 'Save Changes'}
@@ -126,6 +193,17 @@ export default function NegotiationTemplateDetailPage() {
           ))}
         </ul>
       </Card>
+
+      <ConfirmModal
+        open={deleting}
+        onClose={() => !deleteLoading && setDeleting(false)}
+        onConfirm={confirmDelete}
+        title="Delete template"
+        message={`Are you sure you want to delete ${item.name}?`}
+        confirmLabel="Delete"
+        danger
+        loading={deleteLoading}
+      />
     </div>
   )
 }

@@ -39,7 +39,7 @@ export default function ContentCard({
         </Button>
         {(item.status === 'DRAFT' || item.status === 'REJECTED') && (
           <Button size="sm" onClick={() => onSubmit?.(item)}>
-            Submit for Approval
+            Send to Salesperson
           </Button>
         )}
         <Button size="sm" variant="ghost" onClick={() => onDelete?.(item)}>

@@ -9,7 +9,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import DataTable from '../../components/common/DataTable'
 import ConfirmModal from '../../components/common/ConfirmModal'
 import { useToast } from '../../hooks/useToast'
-import escalationService from '../../services/mock/escalationService'
+import bdcEscalationService from '../../services/api/bdcEscalationService'
 import BdcAssignModal from './BdcAssignModal'
 
 export default function BdcEscalationsPage() {
@@ -23,11 +23,14 @@ export default function BdcEscalationsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await escalationService.getEscalations())
+      setRows(await bdcEscalationService.getBdcEscalations())
+    } catch (err) {
+      setRows([])
+      showToast(err.message || 'Unable to load escalations.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -37,10 +40,14 @@ export default function BdcEscalationsPage() {
   const resolve = async () => {
     setResolveLoading(true)
     try {
-      await escalationService.resolveEscalation(resolveTarget.id)
+      await bdcEscalationService.resolveBdcEscalation(
+        resolveTarget.leadId || resolveTarget.id,
+      )
       showToast('Escalation resolved.')
       setResolveTarget(null)
       await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to resolve escalation.', 'error')
     } finally {
       setResolveLoading(false)
     }
@@ -68,9 +75,7 @@ export default function BdcEscalationsPage() {
                 render: (row) => (
                   <div>
                     <p className="font-medium">{row.leadId}</p>
-                    <p className="text-xs text-[var(--text-secondary)]">
-                      {row.vehicle}
-                    </p>
+                    <p className="text-xs text-[var(--text-secondary)]">{row.vehicle}</p>
                   </div>
                 ),
               },
@@ -114,11 +119,8 @@ export default function BdcEscalationsPage() {
                     >
                       Reassign
                     </Button>
-                    {row.status !== 'RESOLVED' && (
-                      <Button
-                        size="sm"
-                        onClick={() => setResolveTarget(row)}
-                      >
+                    {String(row.status).toUpperCase() !== 'RESOLVED' && (
+                      <Button size="sm" onClick={() => setResolveTarget(row)}>
                         Resolve
                       </Button>
                     )}

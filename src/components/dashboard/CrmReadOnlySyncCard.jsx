@@ -2,18 +2,27 @@ import { Link } from 'react-router-dom'
 import Card from '../common/Card'
 import Button from '../common/Button'
 import StatusBadge from '../common/StatusBadge'
-import CrmReadOnlyBanner from '../leads/CrmReadOnlyBanner'
 import { formatNumber } from '../../utils/table'
 
 export default function CrmReadOnlySyncCard({ data }) {
   if (!data) return null
+  const info = data.info || {}
   return (
     <Card>
-      <h2 className="text-base font-semibold">CRM Read-Only Sync</h2>
+      <h2 className="text-base font-semibold">{data.title || 'CRM Read-Only Sync'}</h2>
       <p className="mt-1 text-sm text-[var(--text-secondary)]">
-        Model 31 reads dealership CRM records. It does not write back.
+        {data.description || 'Model 31 reads dealership CRM records. It does not write back.'}
       </p>
-      <CrmReadOnlyBanner className="mt-4" />
+      <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-muted)] px-4 py-3">
+        <p className="text-sm font-semibold">CRM Mode: {info.crmMode || data.mode || 'READ ONLY'}</p>
+        <p className="mt-1 text-xs text-[var(--text-secondary)]">
+          Pipeline: {info.pipeline || 'DEALERSHIP'} · Source: {info.source || 'CRM'} · Model 31 Access:{' '}
+          {info.model31Access || 'READ ONLY'}
+        </p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          {info.note || 'Model 31 does not modify dealership leads.'}
+        </p>
+      </div>
       <dl className="mt-4 space-y-2 text-sm">
         <div className="flex items-center justify-between gap-3">
           <dt className="text-[var(--text-secondary)]">CRM Status</dt>

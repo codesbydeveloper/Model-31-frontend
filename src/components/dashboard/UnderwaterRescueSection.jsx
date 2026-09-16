@@ -24,20 +24,21 @@ const PIE_COLORS = ['#0f2b46', '#1a6b8a', '#1a7a4c', '#9a6b1a', '#5a6b7d']
 
 export default function UnderwaterRescueSection({ data, onOpenFingerprint }) {
   if (!data) return null
-  const { kpis, activity, rescueChart, revenueChart, signalBreakdown } = data
+  const { kpis, activity = [], rescueChart = [], revenueChart = [], signalBreakdown = [] } = data
 
   return (
     <section className="mt-8 rounded-[var(--radius-lg)] border-2 border-[var(--brand-accent)]/35 bg-gradient-to-br from-[#0f2b46]/5 to-[var(--brand-accent-soft)] p-4 sm:p-6">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="mb-2 inline-flex rounded-full bg-[var(--brand-primary)] px-3 py-1 text-xs font-semibold tracking-wide text-white">
-            Included Free in Model 31
+            {data.badge || 'Included Free in Model 31'}
           </div>
           <h2 className="text-xl font-semibold text-[var(--brand-primary)]">
             Underwater Rescue
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-[var(--text-secondary)]">
-            Recover cold, abandoned, and at-risk opportunities. Read-only CRM access only.
+            {data.description ||
+              'Recover cold, abandoned, and at-risk opportunities. Read-only CRM access only.'}
           </p>
         </div>
       </div>
@@ -145,7 +146,7 @@ export default function UnderwaterRescueSection({ data, onOpenFingerprint }) {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => onOpenFingerprint?.(row.leadId)}
+                  onClick={() => onOpenFingerprint?.(row)}
                 >
                   Open Fingerprint
                 </Button>

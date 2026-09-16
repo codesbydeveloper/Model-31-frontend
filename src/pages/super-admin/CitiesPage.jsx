@@ -14,8 +14,11 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import StatusBadge from '../../components/common/StatusBadge'
 import { sortBy } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
-import cityService from '../../services/mock/cityService'
+import cityService from '../../services/api/cityService'
 import { LANGUAGES } from '../../data/settings'
+
+const PAGE_SIZE = 10
+const SEARCH_DEBOUNCE_MS = 400
 
 const EMPTY = {
   city: '',
@@ -34,10 +37,12 @@ export default function CitiesPage() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortKey, setSortKey] = useState('city')
   const [sortDir, setSortDir] = useState('asc')
   const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY)
@@ -49,11 +54,33 @@ export default function CitiesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await cityService.getCities())
+      const result = await cityService.getCities({
+        page,
+        limit: PAGE_SIZE,
+        search: debouncedSearch,
+        status: statusFilter,
+      })
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load cities.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, debouncedSearch, statusFilter, showToast])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -62,20 +89,10 @@ export default function CitiesPage() {
     return () => window.clearTimeout(timer)
   }, [load])
 
-  const filtered = useMemo(() => {
-    let list = rows
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (r) =>
-          r.city.toLowerCase().includes(q) ||
-          r.state.toLowerCase().includes(q) ||
-          r.regionalTone.toLowerCase().includes(q),
-      )
-    }
-    if (statusFilter !== 'all') list = list.filter((r) => r.status === statusFilter)
-    return sortBy(list, sortKey, sortDir)
-  }, [rows, search, statusFilter, sortKey, sortDir])
+  const filtered = useMemo(
+    () => sortBy(rows, sortKey, sortDir),
+    [rows, sortKey, sortDir],
+  )
 
   const openCreate = () => {
     setEditing(null)
@@ -84,18 +101,27 @@ export default function CitiesPage() {
     setModalOpen(true)
   }
 
-  const openEdit = (row) => {
-    setEditing(row)
-    setForm({ ...row })
+  const openEdit = async (row) => {
     setErrors({})
+    setEditing(row)
+    setForm({ ...EMPTY, ...row })
     setModalOpen(true)
+    try {
+      const city = await cityService.getCityById(row.id)
+      if (city) {
+        setEditing(city)
+        setForm({ ...EMPTY, ...city })
+      }
+    } catch (err) {
+      showToast(err.message || 'Unable to load city.', 'error')
+    }
   }
 
   const onSubmit = async (e) => {
     e.preventDefault()
     const next = {}
-    if (!form.city.trim()) next.city = 'City is required.'
-    if (!form.state.trim()) next.state = 'State is required.'
+    if (!String(form.city || '').trim()) next.city = 'City is required.'
+    if (!String(form.state || '').trim()) next.state = 'State is required.'
     setErrors(next)
     if (Object.keys(next).length) return
 
@@ -109,7 +135,13 @@ export default function CitiesPage() {
         showToast('City added successfully.')
       }
       setModalOpen(false)
-      await load()
+      if (editing || page === 1) {
+        await load()
+      } else {
+        setPage(1)
+      }
+    } catch (err) {
+      showToast(err.message || 'Unable to save city.', 'error')
     } finally {
       setSaving(false)
     }
@@ -122,6 +154,8 @@ export default function CitiesPage() {
       showToast('City deleted successfully.')
       setDeleting(null)
       await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to delete city.', 'error')
     } finally {
       setDeleteLoading(false)
     }
@@ -182,10 +216,7 @@ export default function CitiesPage() {
         <div className="mb-4 flex flex-col gap-2 sm:flex-row">
           <SearchInput
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search cities"
             className="sm:max-w-xs"
           />
@@ -222,6 +253,9 @@ export default function CitiesPage() {
               }
             }}
             page={page}
+            pageSize={PAGE_SIZE}
+            totalItems={totalItems}
+            showPagination
             onPageChange={setPage}
             emptyTitle="No cities found."
             emptyActionLabel="Add City"

@@ -11,8 +11,8 @@ import StatusBadge from '../../components/common/StatusBadge'
 import ConfirmModal from '../../components/common/ConfirmModal'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { useToast } from '../../hooks/useToast'
-import salespersonService from '../../services/mock/salespersonService'
-import appointmentService from '../../services/mock/appointmentService'
+import salespersonPortalService from '../../services/api/salespersonPortalService'
+import { getSalespersonAppointments } from '../../services/api/salespersonAppointmentService'
 import { SP_LEAD_STATUSES } from '../../data/salespersonLeads'
 import CreateAppointmentModal from './appointments/CreateAppointmentModal'
 import MarkSoldModal from './leads/MarkSoldModal'
@@ -22,10 +22,12 @@ import PipelineBadge from '../../components/common/PipelineBadge'
 
 function formatTime(time) {
   if (!time) return ''
-  const [h, m] = time.split(':').map(Number)
+  if (/am|pm/i.test(String(time))) return String(time)
+  const [h, m] = String(time).split(':').map(Number)
+  if (!Number.isFinite(h)) return String(time)
   const period = h >= 12 ? 'PM' : 'AM'
   const hour = h % 12 || 12
-  return `${hour}:${String(m).padStart(2, '0')} ${period}`
+  return `${hour}:${String(m || 0).padStart(2, '0')} ${period}`
 }
 
 export default function SalespersonLeadDetailPage() {
@@ -33,6 +35,7 @@ export default function SalespersonLeadDetailPage() {
   const { showToast } = useToast()
   const [lead, setLead] = useState(null)
   const [appointment, setAppointment] = useState(null)
+  const [script, setScript] = useState(null)
   const [loading, setLoading] = useState(true)
   const [noteOpen, setNoteOpen] = useState(false)
   const [note, setNote] = useState('')
@@ -48,24 +51,30 @@ export default function SalespersonLeadDetailPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await salespersonService.getMyLeadById(id)
+      const data = await salespersonPortalService.getMyLead(id)
       setLead(data)
-      if (data) setStatus(data.status)
-      const all = await appointmentService.getAppointments('sp_001')
-      const related = all
+      if (data) setStatus(String(data.status || 'NEW').toUpperCase())
+      setScript(data?.salesScript || null)
+      const appts = await getSalespersonAppointments({ page: 1, limit: 10 }).catch(() => ({
+        items: [],
+      }))
+      const related = (appts.items || [])
         .filter(
           (a) =>
-            a.leadId === id &&
+            String(a.leadId) === String(id) &&
             a.status !== 'CANCELLED' &&
             a.status !== 'COMPLETED' &&
             a.status !== 'NO SHOW',
         )
         .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))[0]
       setAppointment(related || null)
+    } catch (err) {
+      setLead(null)
+      showToast(err.message || 'Unable to load lead.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -77,11 +86,14 @@ export default function SalespersonLeadDetailPage() {
     if (!note.trim()) return
     setNoteSaving(true)
     try {
-      const updated = await salespersonService.addMyLeadNote(id, note.trim())
-      setLead(updated)
+      const updated = await salespersonPortalService.addMyLeadNote(id, note.trim())
+      if (updated && updated !== true) setLead(updated)
+      else await load()
       setNote('')
       setNoteOpen(false)
       showToast('Note added.')
+    } catch (err) {
+      showToast(err.message || 'Unable to add note.', 'error')
     } finally {
       setNoteSaving(false)
     }
@@ -90,10 +102,13 @@ export default function SalespersonLeadDetailPage() {
   const saveStatus = async () => {
     setStatusSaving(true)
     try {
-      const updated = await salespersonService.updateMyLeadStatus(id, status)
-      setLead(updated)
+      const updated = await salespersonPortalService.updateMyLeadStatus(id, status)
+      if (updated && updated !== true) setLead(updated)
+      else await load()
       setStatusOpen(false)
       showToast('Status updated.')
+    } catch (err) {
+      showToast(err.message || 'Unable to update status.', 'error')
     } finally {
       setStatusSaving(false)
     }
@@ -102,10 +117,13 @@ export default function SalespersonLeadDetailPage() {
   const markNotSold = async () => {
     setActionBusy(true)
     try {
-      const updated = await salespersonService.updateMyLeadStatus(id, 'NOT SOLD')
-      setLead(updated)
+      const updated = await salespersonPortalService.markMyLeadNotSold(id)
+      if (updated && updated !== true) setLead(updated)
+      else await load()
       setNotSoldOpen(false)
       showToast('Lead marked as not sold.')
+    } catch (err) {
+      showToast(err.message || 'Unable to mark as not sold.', 'error')
     } finally {
       setActionBusy(false)
     }
@@ -177,7 +195,28 @@ export default function SalespersonLeadDetailPage() {
         </div>
       </Card>
 
-      <AcquisitionSignalsCard customerName={lead.customerName} />
+      <Card className="mb-4">
+        <h2 className="text-base font-semibold">Sales Script</h2>
+        {script ? (
+          <div className="mt-3">
+            <p className="whitespace-pre-wrap text-sm">{script.script}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <StatusBadge status={script.status} />
+              <Link to={`/salesperson/scripts/${script.id}`}>
+                <Button size="sm">
+                  {script.status === 'PENDING' ? 'Approve Script' : 'Open Script'}
+                </Button>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-[var(--text-secondary)]">
+            No sales script yet for this lead.
+          </p>
+        )}
+      </Card>
+
+      <AcquisitionSignalsCard signals={lead.acquisitionSignals} />
 
       <Card className="mb-4">
         <h2 className="text-base font-semibold">Upcoming Appointment</h2>
@@ -219,7 +258,7 @@ export default function SalespersonLeadDetailPage() {
         <Button variant="secondary" className="min-h-11" onClick={() => setStatusOpen(true)}>
           Change Status
         </Button>
-        <Link to="/salesperson/conversations">
+        <Link to={`/salesperson/conversations?lead=${lead.id}`}>
           <Button variant="secondary" className="min-h-11 w-full">
             Conversation
           </Button>
@@ -333,8 +372,11 @@ export default function SalespersonLeadDetailPage() {
         onCreated={async () => {
           showToast('Appointment scheduled successfully.')
           setApptOpen(false)
-          const updated = await salespersonService.updateMyLeadStatus(id, 'APPOINTMENT')
-          setLead(updated)
+          try {
+            await salespersonPortalService.updateMyLeadStatus(id, 'APPOINTMENT')
+          } catch {
+            /* appointment create already succeeded */
+          }
           await load()
         }}
       />
@@ -345,7 +387,6 @@ export default function SalespersonLeadDetailPage() {
         onClose={() => setSoldOpen(false)}
         onSold={async () => {
           showToast('Deal marked as sold.')
-          showToast('Commission calculated successfully.')
           setSoldOpen(false)
           await load()
         }}
@@ -369,7 +410,7 @@ function Info({ label, value }) {
   return (
     <div className="flex justify-between gap-3">
       <dt className="text-[var(--text-secondary)]">{label}</dt>
-      <dd className="font-medium">{value}</dd>
+      <dd className="font-medium">{value || '—'}</dd>
     </div>
   )
 }

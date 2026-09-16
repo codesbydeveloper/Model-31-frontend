@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
@@ -7,42 +7,73 @@ import Input from '../../components/common/Input'
 import Select from '../../components/common/Select'
 import Toggle from '../../components/common/Toggle'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
+import ErrorState from '../../components/ui/ErrorState'
 import { useToast } from '../../hooks/useToast'
-import settingsService from '../../services/mock/settingsService'
-import { LANGUAGES, TIMEZONES } from '../../data/settings'
+import {
+  getPlatformSettings,
+  savePlatformSettings,
+} from '../../services/api/superAdminSettingsService'
 
 export default function PlatformSettingsPage() {
   const { showToast } = useToast()
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(false)
+    try {
+      setSettings(await getPlatformSettings())
+    } catch (err) {
+      setSettings(null)
+      setError(true)
+      showToast(err.message || 'Unable to load platform settings.', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [showToast])
 
   useEffect(() => {
-    ;(async () => {
-      setLoading(true)
-      setSettings(await settingsService.getPlatformSettings())
-      setLoading(false)
-    })()
-  }, [])
+    const timer = window.setTimeout(() => void load(), 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
-  const update = (section, key, value) => {
+  const updateGeneral = (key, value) => {
     setSettings((prev) => ({
       ...prev,
-      [section]: { ...prev[section], [key]: value },
+      general: { ...prev.general, [key]: value },
+    }))
+  }
+
+  const updateToggle = (section, key, enabled) => {
+    setSettings((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        toggles: prev[section].toggles.map((item) =>
+          item.key === key ? { ...item, enabled } : item,
+        ),
+      },
     }))
   }
 
   const onSave = async () => {
+    if (!settings) return
     setSaving(true)
     try {
-      await settingsService.savePlatformSettings(settings)
-      showToast('Platform settings saved successfully.')
+      const saved = await savePlatformSettings(settings)
+      setSettings(saved)
+      showToast(saved.message || 'Platform settings saved successfully.')
+    } catch (err) {
+      showToast(err.message || 'Unable to save platform settings.', 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading || !settings) {
+  if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <LoadingSpinner size={32} />
@@ -50,12 +81,16 @@ export default function PlatformSettingsPage() {
     )
   }
 
+  if (error || !settings) {
+    return <ErrorState onRetry={load} />
+  }
+
   return (
     <div className="mx-auto w-full max-w-4xl">
       <Breadcrumbs />
       <PageHeader
-        title="Platform Settings"
-        description="Manage global AutoFlow platform configuration."
+        title={settings.pageTitle}
+        description={settings.description}
         actions={
           <Button onClick={onSave} disabled={saving}>
             {saving ? (
@@ -77,86 +112,53 @@ export default function PlatformSettingsPage() {
             <Input
               label="Platform Name"
               value={settings.general.platformName}
-              onChange={(e) => update('general', 'platformName', e.target.value)}
+              onChange={(e) => updateGeneral('platformName', e.target.value)}
               containerClassName="sm:col-span-2"
             />
             <Select
               label="Timezone"
               value={settings.general.timezone}
-              onChange={(e) => update('general', 'timezone', e.target.value)}
-              options={TIMEZONES}
+              onChange={(e) => updateGeneral('timezone', e.target.value)}
+              options={settings.options.timezones}
             />
             <Select
               label="Default Language"
               value={settings.general.defaultLanguage}
-              onChange={(e) =>
-                update('general', 'defaultLanguage', e.target.value)
-              }
-              options={LANGUAGES}
+              onChange={(e) => updateGeneral('defaultLanguage', e.target.value)}
+              options={settings.options.languages}
             />
           </div>
         </Card>
 
         <Card>
-          <h2 className="text-base font-semibold">Notification Settings</h2>
+          <h2 className="text-base font-semibold">{settings.notifications.title}</h2>
           <div className="mt-4 space-y-4">
-            <Toggle
-              label="Email Notifications"
-              checked={settings.notifications.emailNotifications}
-              onChange={(v) => update('notifications', 'emailNotifications', v)}
-            />
-            <Toggle
-              label="Lead Alerts"
-              checked={settings.notifications.leadAlerts}
-              onChange={(v) => update('notifications', 'leadAlerts', v)}
-            />
-            <Toggle
-              label="System Alerts"
-              checked={settings.notifications.systemAlerts}
-              onChange={(v) => update('notifications', 'systemAlerts', v)}
-            />
-            <Toggle
-              label="CRM Alerts"
-              checked={settings.notifications.crmAlerts}
-              onChange={(v) => update('notifications', 'crmAlerts', v)}
-            />
+            {settings.notifications.toggles.map((item) => (
+              <Toggle
+                key={item.key}
+                label={item.label}
+                checked={item.enabled}
+                onChange={(value) => updateToggle('notifications', item.key, value)}
+              />
+            ))}
           </div>
         </Card>
 
         <Card>
-          <h2 className="text-base font-semibold">AI Settings & System Controls</h2>
+          <h2 className="text-base font-semibold">{settings.aiAndSystemControls.title}</h2>
           <div className="mt-4 space-y-4">
-            <Toggle
-              label="AI Conversation"
-              checked={settings.system.aiConversation}
-              onChange={(v) => update('system', 'aiConversation', v)}
-            />
-            <Toggle
-              label="Lead Qualification"
-              checked={settings.system.leadQualification}
-              onChange={(v) => update('system', 'leadQualification', v)}
-            />
-            <Toggle
-              label="Lead Dispatch"
-              checked={settings.system.leadDispatch}
-              onChange={(v) => update('system', 'leadDispatch', v)}
-            />
-            <Toggle
-              label="Social Posting"
-              checked={settings.system.socialPosting}
-              onChange={(v) => update('system', 'socialPosting', v)}
-            />
-            <Toggle
-              label="CRM Sync"
-              checked={settings.system.crmSync}
-              onChange={(v) => update('system', 'crmSync', v)}
-            />
-            <Toggle
-              label="System Autonomy"
-              checked={settings.system.systemAutonomy}
-              onChange={(v) => update('system', 'systemAutonomy', v)}
-            />
+            {settings.aiAndSystemControls.toggles.map((item) => (
+              <Toggle
+                key={item.key}
+                label={item.label}
+                checked={item.enabled}
+                onChange={(value) => updateToggle('aiAndSystemControls', item.key, value)}
+              />
+            ))}
           </div>
+          {settings.enforcementNote ? (
+            <p className="mt-4 text-xs text-[var(--text-muted)]">{settings.enforcementNote}</p>
+          ) : null}
         </Card>
       </div>
     </div>

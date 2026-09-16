@@ -12,42 +12,98 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import DataTable from '../../components/common/DataTable'
 import { formatNumber } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
-import crmService from '../../services/mock/crmService'
 import CrmReadOnlyBanner from '../../components/leads/CrmReadOnlyBanner'
+import {
+  getCrmIntegration,
+  syncCrmNow,
+  getCrmSettings,
+  saveCrmSettings,
+  getCrmSynchronization,
+  retryCrmSyncError,
+  getCrmFieldMapping,
+  getCrmIntegrationActivity,
+  getCrmHealth,
+} from '../../services/api/superAdminCrmService'
 
 const TABS = ['Connection', 'Synchronization', 'Field Mapping', 'Activity', 'Health']
+
+const EMPTY_SETTINGS = {
+  environment: 'Production',
+  syncFrequency: 'Every 15 minutes',
+  timezone: 'America/New_York',
+  autoSync: true,
+  leadSync: true,
+  customerSync: true,
+  appointmentSync: true,
+  soldDealSync: true,
+  options: {
+    environments: ['Production', 'Sandbox'],
+    frequencies: ['Every 15 minutes', 'Hourly', 'Daily'],
+    timezones: ['America/New_York', 'America/Chicago', 'America/Los_Angeles'],
+  },
+}
 
 export default function CrmIntegrationDetailPage() {
   const { id } = useParams()
   const [params] = useSearchParams()
   const { showToast } = useToast()
   const [item, setItem] = useState(null)
+  const [settings, setSettings] = useState(EMPTY_SETTINGS)
   const [errors, setErrors] = useState([])
+  const [mappings, setMappings] = useState([])
   const [activity, setActivity] = useState([])
+  const [health, setHealth] = useState(null)
   const [tab, setTab] = useState(params.get('tab') || 'Connection')
   const [loading, setLoading] = useState(true)
+  const [tabLoading, setTabLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [retryingId, setRetryingId] = useState(null)
 
-  const load = useCallback(async () => {
+  const loadItem = useCallback(async () => {
     setLoading(true)
     try {
-      const [crm, errs, act] = await Promise.all([
-        crmService.getCRMById(id),
-        crmService.getCRMSyncErrors(id),
-        crmService.getCRMActivity(id),
-      ])
-      setItem(crm)
-      setErrors(errs)
-      setActivity(act)
+      setItem(await getCrmIntegration(id))
+    } catch (err) {
+      setItem(null)
+      showToast(err.message || 'Unable to load CRM integration.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showToast])
+
+  const loadTab = useCallback(async () => {
+    if (!id) return
+    setTabLoading(true)
+    try {
+      if (tab === 'Connection') {
+        setSettings(await getCrmSettings(id))
+      } else if (tab === 'Synchronization') {
+        const result = await getCrmSynchronization(id)
+        setErrors(result.items)
+      } else if (tab === 'Field Mapping') {
+        setMappings(await getCrmFieldMapping(id))
+      } else if (tab === 'Activity') {
+        setActivity(await getCrmIntegrationActivity(id))
+      } else if (tab === 'Health') {
+        setHealth(await getCrmHealth(id))
+      }
+    } catch (err) {
+      showToast(err.message || 'Unable to load this tab.', 'error')
+    } finally {
+      setTabLoading(false)
+    }
+  }, [id, tab, showToast])
 
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 0)
+    const t = window.setTimeout(() => void loadItem(), 0)
     return () => window.clearTimeout(t)
-  }, [load])
+  }, [loadItem])
+
+  useEffect(() => {
+    const t = window.setTimeout(() => void loadTab(), 0)
+    return () => window.clearTimeout(t)
+  }, [loadTab])
 
   if (loading) {
     return (
@@ -68,10 +124,22 @@ export default function CrmIntegrationDetailPage() {
     )
   }
 
-  const update = async (payload) => {
-    const updated = await crmService.updateCRMSettings(id, payload)
-    setItem(updated)
-    showToast('Settings updated.')
+  const saveSettings = async () => {
+    setSaving(true)
+    try {
+      const saved = await saveCrmSettings(id, settings)
+      setSettings(saved)
+      showToast('Settings updated.')
+      await loadItem()
+    } catch (err) {
+      showToast(err.message || 'Unable to save settings.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const setField = (key, value) => {
+    setSettings((prev) => ({ ...prev, [key]: value }))
   }
 
   return (
@@ -87,7 +155,7 @@ export default function CrmIntegrationDetailPage() {
       </div>
       <PageHeader
         title={item.name}
-        description={`${item.environment} · Connected ${item.connectedDate}`}
+        description={`${item.environment} · Connected ${item.connectedDate || '—'}`.trim()}
         actions={<StatusBadge status={item.status} />}
       />
 
@@ -100,9 +168,12 @@ export default function CrmIntegrationDetailPage() {
           onClick={async () => {
             setSyncing(true)
             try {
-              await crmService.syncCRM(id)
+              await syncCrmNow(id)
               showToast('Sync completed successfully.')
-              await load()
+              await loadItem()
+              if (tab === 'Synchronization' || tab === 'Activity') await loadTab()
+            } catch (err) {
+              showToast(err.message || 'Sync failed.', 'error')
             } finally {
               setSyncing(false)
             }
@@ -142,66 +213,78 @@ export default function CrmIntegrationDetailPage() {
         ))}
       </div>
 
-      {tab === 'Connection' && (
+      {tabLoading ? (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size={28} />
+        </div>
+      ) : tab === 'Connection' ? (
         <Card className="grid gap-4">
           <Select
             label="Environment"
-            value={item.environment}
-            onChange={(e) => update({ environment: e.target.value })}
-            options={[
-              { value: 'Production', label: 'Production' },
-              { value: 'Sandbox', label: 'Sandbox' },
-            ]}
+            value={settings.environment}
+            onChange={(e) => setField('environment', e.target.value)}
+            options={(settings.options?.environments || []).map((value) => ({
+              value,
+              label: value,
+            }))}
           />
           <Select
             label="Sync Frequency"
-            value={item.syncFrequency}
-            onChange={(e) => update({ syncFrequency: e.target.value })}
-            options={[
-              { value: 'Every 15 minutes', label: 'Every 15 minutes' },
-              { value: 'Hourly', label: 'Hourly' },
-              { value: 'Daily', label: 'Daily' },
-            ]}
+            value={settings.syncFrequency}
+            onChange={(e) => setField('syncFrequency', e.target.value)}
+            options={(settings.options?.frequencies || []).map((value) => ({
+              value,
+              label: value,
+            }))}
           />
           <Select
             label="Timezone"
-            value={item.timezone}
-            onChange={(e) => update({ timezone: e.target.value })}
-            options={[
-              { value: 'America/New_York', label: 'America/New_York' },
-              { value: 'America/Chicago', label: 'America/Chicago' },
-              { value: 'America/Los_Angeles', label: 'America/Los_Angeles' },
-            ]}
+            value={settings.timezone}
+            onChange={(e) => setField('timezone', e.target.value)}
+            options={(settings.options?.timezones || []).map((value) => ({
+              value,
+              label: value,
+            }))}
           />
           <Toggle
             label="Auto Sync"
-            checked={item.autoSync}
-            onChange={(next) => update({ autoSync: next })}
+            checked={settings.autoSync}
+            onChange={(next) => setField('autoSync', next)}
           />
           <Toggle
             label="Lead Sync"
-            checked={item.leadSync}
-            onChange={(next) => update({ leadSync: next })}
+            checked={settings.leadSync}
+            onChange={(next) => setField('leadSync', next)}
           />
           <Toggle
             label="Customer Sync"
-            checked={item.customerSync}
-            onChange={(next) => update({ customerSync: next })}
+            checked={settings.customerSync}
+            onChange={(next) => setField('customerSync', next)}
           />
           <Toggle
             label="Appointment Sync"
-            checked={item.appointmentSync}
-            onChange={(next) => update({ appointmentSync: next })}
+            checked={settings.appointmentSync}
+            onChange={(next) => setField('appointmentSync', next)}
           />
           <Toggle
             label="Sold Deal Sync"
-            checked={item.soldDealSync}
-            onChange={(next) => update({ soldDealSync: next })}
+            checked={settings.soldDealSync}
+            onChange={(next) => setField('soldDealSync', next)}
           />
+          <div>
+            <Button onClick={() => void saveSettings()} disabled={saving}>
+              {saving ? (
+                <>
+                  <LoadingSpinner size={16} />
+                  Saving…
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
+          </div>
         </Card>
-      )}
-
-      {tab === 'Synchronization' && (
+      ) : tab === 'Synchronization' ? (
         <Card>
           <DataTable
             columns={[
@@ -218,16 +301,24 @@ export default function CrmIntegrationDetailPage() {
                 key: 'action',
                 label: 'Action',
                 render: (row) =>
-                  row.status === 'FAILED' ? (
+                  String(row.status).toUpperCase() === 'FAILED' ? (
                     <Button
                       size="sm"
+                      disabled={retryingId === row.id}
                       onClick={async () => {
-                        await crmService.retryCRMError(row.id)
-                        showToast('Retry started.')
-                        await load()
+                        setRetryingId(row.id)
+                        try {
+                          await retryCrmSyncError(row.id)
+                          showToast('Retry started.')
+                          await loadTab()
+                        } catch (err) {
+                          showToast(err.message || 'Unable to retry sync error.', 'error')
+                        } finally {
+                          setRetryingId(null)
+                        }
                       }}
                     >
-                      Retry
+                      {retryingId === row.id ? <LoadingSpinner size={14} /> : 'Retry'}
                     </Button>
                   ) : (
                     '—'
@@ -239,13 +330,11 @@ export default function CrmIntegrationDetailPage() {
             emptyTitle="No sync errors for this CRM."
           />
         </Card>
-      )}
-
-      {tab === 'Field Mapping' && (
+      ) : tab === 'Field Mapping' ? (
         <Card>
           <DataTable
             columns={[
-              { key: 'source', label: 'AutoFlow Field' },
+              { key: 'source', label: 'Model 31 Field' },
               { key: 'target', label: 'CRM Field' },
               {
                 key: 'status',
@@ -253,45 +342,46 @@ export default function CrmIntegrationDetailPage() {
                 render: (row) => <StatusBadge status={row.status} />,
               },
             ]}
-            rows={item.fieldMappings || []}
+            rows={mappings}
             pageSize={10}
+            emptyTitle="No field mappings yet."
           />
         </Card>
-      )}
-
-      {tab === 'Activity' && (
+      ) : tab === 'Activity' ? (
         <Card>
-          <ul className="space-y-2">
-            {activity.map((a) => (
-              <li
-                key={a.id}
-                className="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-2 text-sm"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium">{a.event}</p>
-                  <StatusBadge status={a.status} />
-                </div>
-                <p className="text-xs text-[var(--text-secondary)]">{a.time}</p>
-              </li>
-            ))}
-          </ul>
+          {activity.length === 0 ? (
+            <p className="text-sm text-[var(--text-secondary)]">No activity for this CRM.</p>
+          ) : (
+            <ul className="space-y-2">
+              {activity.map((a) => (
+                <li
+                  key={a.id}
+                  className="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-2 text-sm"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">{a.event}</p>
+                    <StatusBadge status={a.status} />
+                  </div>
+                  <p className="text-xs text-[var(--text-secondary)]">{a.time}</p>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
-      )}
-
-      {tab === 'Health' && (
+      ) : (
         <Card>
           <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
             <div>
               <dt className="text-[var(--text-muted)]">Latency</dt>
-              <dd className="text-lg font-semibold">{item.health?.latencyMs} ms</dd>
+              <dd className="text-lg font-semibold">{health?.latencyMs ?? 0} ms</dd>
             </div>
             <div>
               <dt className="text-[var(--text-muted)]">Uptime</dt>
-              <dd className="text-lg font-semibold">{item.health?.uptime}%</dd>
+              <dd className="text-lg font-semibold">{health?.uptime ?? 0}%</dd>
             </div>
             <div>
               <dt className="text-[var(--text-muted)]">Last Check</dt>
-              <dd className="text-lg font-semibold">{item.health?.lastCheck}</dd>
+              <dd className="text-lg font-semibold">{health?.lastCheck || '—'}</dd>
             </div>
           </dl>
         </Card>

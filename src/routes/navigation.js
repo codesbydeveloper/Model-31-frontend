@@ -48,11 +48,12 @@ import {
   Workflow,
   Scale,
   FileStack,
+  ClipboardCheck,
 } from 'lucide-react'
 import { ROLES } from '../data/roles'
 
 /**
- * Centralized role-based navigation for AutoFlow.
+ * Centralized role-based navigation for Model 31.
  * Placeholder routes only — business modules come in later steps.
  */
 
@@ -80,7 +81,7 @@ export const ROLE_NAVIGATION = {
       icon: Building2,
       title: 'Dealerships',
       subtitle: 'Dealership Management',
-      description: 'Manage dealerships across the AutoFlow platform.',
+      description: 'Manage dealerships across the Model 31 platform.',
     },
     {
       label: 'Leads',
@@ -89,7 +90,7 @@ export const ROLE_NAVIGATION = {
       title: 'Leads',
       subtitle: 'Lead Management',
       description:
-        'Manage, qualify and monitor customer leads across the AutoFlow platform.',
+        'Manage, qualify and monitor customer leads across the Model 31 platform.',
     },
     {
       label: 'Cities',
@@ -137,9 +138,9 @@ export const ROLE_NAVIGATION = {
       icon: Cable,
       title: 'CRM Integrations',
       subtitle:
-        'Manage CRM connections, synchronization and integration health across the AutoFlow platform.',
+        'Manage CRM connections, synchronization and integration health across the Model 31 platform.',
       description:
-        'Manage CRM connections, synchronization and integration health across the AutoFlow platform.',
+        'Manage CRM connections, synchronization and integration health across the Model 31 platform.',
     },
     {
       label: 'Customer Identity',
@@ -178,6 +179,14 @@ export const ROLE_NAVIGATION = {
         'Monitor platform-wide lead, sales, AI, marketing and dealership performance.',
       description:
         'Monitor platform-wide lead, sales, AI, marketing and dealership performance.',
+    },
+    {
+      label: 'OEM Reporting',
+      path: '/super-admin/oem-reporting',
+      icon: ClipboardCheck,
+      title: 'OEM Reporting',
+      subtitle: 'Brand-level visibility for compliance and enterprise alignment.',
+      description: 'Brand-level visibility for compliance and enterprise alignment.',
     },
     {
       label: 'Events',
@@ -251,7 +260,7 @@ export const ROLE_NAVIGATION = {
       icon: Settings,
       title: 'Platform Settings',
       subtitle: 'Platform Configuration',
-      description: 'Manage global AutoFlow platform settings.',
+      description: 'Manage global Model 31 platform settings.',
       isSettings: true,
     },
   ],
@@ -420,6 +429,15 @@ export const ROLE_NAVIGATION = {
       mobilePriority: true,
     },
     {
+      label: 'Scripts',
+      path: '/salesperson/scripts',
+      icon: FileText,
+      title: 'Sales Scripts',
+      subtitle: 'Approve and copy sales scripts',
+      description: 'Approve Model 31 sales scripts, then copy them into CapCut or Instagram yourself.',
+      mobilePriority: true,
+    },
+    {
       label: 'Conversations',
       path: '/salesperson/conversations',
       icon: MessageSquare,
@@ -460,8 +478,8 @@ export const ROLE_NAVIGATION = {
       path: '/marketing/dashboard',
       icon: LayoutDashboard,
       title: 'Marketing Dashboard',
-      subtitle: 'Create, approve, schedule and monitor AI-powered dealership marketing content.',
-      description: 'Create, approve, schedule and monitor AI-powered dealership marketing content.',
+      subtitle: 'Support portal for buyer signals and sales-script words. Model 31 does not auto-publish posts or videos.',
+      description: 'Support portal for buyer signals and sales-script words. Model 31 does not auto-publish posts or videos.',
     },
     {
       label: 'Acquisition Dashboard',
@@ -548,28 +566,28 @@ export const ROLE_NAVIGATION = {
       section: 'Customer Acquisition',
     },
     {
-      label: 'AI Content',
+      label: 'Sales Scripts',
       path: '/marketing/content',
       icon: Sparkles,
-      title: 'AI Content',
-      subtitle: 'Create and manage AI-generated dealership marketing content.',
-      description: 'Create and manage AI-generated dealership marketing content.',
+      title: 'Sales Scripts',
+      subtitle: 'Generate sales-script words only. No video or auto-publish.',
+      description: 'Generate sales-script words only. No video or auto-publish.',
     },
     {
       label: 'Approval Queue',
       path: '/marketing/approval',
       icon: CheckSquare,
       title: 'Approval Queue',
-      subtitle: 'Review and approve marketing content before publishing.',
-      description: 'Review and approve marketing content before publishing.',
+      subtitle: 'Review sales scripts before they go to the salesperson.',
+      description: 'Review sales scripts before they go to the salesperson.',
     },
     {
       label: 'Scheduled Posts',
       path: '/marketing/scheduled',
       icon: CalendarClock,
       title: 'Scheduled Posts',
-      subtitle: 'Calendar and list of scheduled marketing content.',
-      description: 'Manage upcoming scheduled posts.',
+      subtitle: 'Model 31 does not auto-publish. Use this only as a reminder list.',
+      description: 'Model 31 does not auto-publish. Use this only as a reminder list.',
     },
     {
       label: 'Social Accounts',
@@ -650,6 +668,9 @@ export function getPageTitle(pathname, role) {
   if (/^\/salesperson\/appointments\/[^/]+$/.test(pathname)) {
     return 'Appointment Details'
   }
+  if (/^\/salesperson\/scripts\/[^/]+$/.test(pathname)) {
+    return 'Script Details'
+  }
   if (/^\/marketing\/acquisition\/engagement\/[^/]+$/.test(pathname)) {
     return 'Engagement Details'
   }
@@ -663,10 +684,10 @@ export function getPageTitle(pathname, role) {
     return 'Follow-Up Sequence'
   }
   if (/^\/marketing\/content\/create$/.test(pathname)) {
-    return 'Create Content'
+    return 'Create Sales Script'
   }
   if (/^\/marketing\/content\/[^/]+$/.test(pathname)) {
-    return 'Content Details'
+    return 'Script Details'
   }
   if (/^\/marketing\/campaigns\/[^/]+$/.test(pathname)) {
     return 'Campaign Details'
@@ -683,12 +704,21 @@ export function getPageTitle(pathname, role) {
   if (/^\/super-admin\/inventory\/[^/]+$/.test(pathname)) {
     return 'Inventory Details'
   }
+  if (/^\/super-admin\/pipeline-transparency\/[^/]+$/.test(pathname)) {
+    return 'Lead Details'
+  }
+  if (/^\/super-admin\/negotiation-control\/[^/]+$/.test(pathname)) {
+    return 'Negotiation Limits'
+  }
+  if (/^\/super-admin\/deal-handoffs\/[^/]+$/.test(pathname)) {
+    return 'Deal Handoff'
+  }
   const item = findNavItemByPath(pathname, role)
   if (item) return item.title
   if (pathname === '/profile') return 'Profile'
   if (pathname === '/settings') return 'Settings'
   if (pathname === '/access-denied') return 'Access Restricted'
-  return 'AutoFlow'
+  return 'Model 31'
 }
 
 export function buildBreadcrumbs(pathname, role) {
@@ -754,19 +784,27 @@ export function buildBreadcrumbs(pathname, role) {
     ]
   }
 
+  const spScriptDetailMatch = pathname.match(/^\/salesperson\/scripts\/([^/]+)$/)
+  if (spScriptDetailMatch) {
+    return [
+      { label: 'Scripts', path: '/salesperson/scripts' },
+      { label: 'Script Details', path: pathname },
+    ]
+  }
+
   const marketingContentCreate = pathname === '/marketing/content/create'
   if (marketingContentCreate) {
     return [
-      { label: 'AI Content', path: '/marketing/content' },
-      { label: 'Create Content', path: pathname },
+      { label: 'Sales Scripts', path: '/marketing/content' },
+      { label: 'Create Sales Script', path: pathname },
     ]
   }
 
   const marketingContentDetail = pathname.match(/^\/marketing\/content\/([^/]+)$/)
   if (marketingContentDetail) {
     return [
-      { label: 'AI Content', path: '/marketing/content' },
-      { label: 'Content Details', path: pathname },
+      { label: 'Sales Scripts', path: '/marketing/content' },
+      { label: 'Script Details', path: pathname },
     ]
   }
 
@@ -807,6 +845,36 @@ export function buildBreadcrumbs(pathname, role) {
     return [
       { label: 'Inventory', path: '/super-admin/inventory' },
       { label: 'Inventory Details', path: pathname },
+    ]
+  }
+
+  const pipelineLeadMatch = pathname.match(
+    /^\/super-admin\/pipeline-transparency\/([^/]+)$/,
+  )
+  if (pipelineLeadMatch) {
+    return [
+      { label: 'Pipeline Transparency', path: '/super-admin/pipeline-transparency' },
+      { label: 'Lead Details', path: pathname },
+    ]
+  }
+
+  const negotiationLimitMatch = pathname.match(
+    /^\/super-admin\/negotiation-control\/([^/]+)$/,
+  )
+  if (negotiationLimitMatch) {
+    return [
+      { label: 'Negotiation Control', path: '/super-admin/negotiation-control' },
+      { label: 'Negotiation Limits', path: pathname },
+    ]
+  }
+
+  const dealHandoffMatch = pathname.match(
+    /^\/super-admin\/deal-handoffs\/([^/]+)$/,
+  )
+  if (dealHandoffMatch) {
+    return [
+      { label: 'Deal Handoffs', path: '/super-admin/deal-handoffs' },
+      { label: 'Deal Handoff', path: pathname },
     ]
   }
 

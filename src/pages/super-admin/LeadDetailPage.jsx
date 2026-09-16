@@ -21,8 +21,8 @@ import ConfirmModal from '../../components/common/ConfirmModal'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import StatusBadge from '../../components/common/StatusBadge'
 import { useToast } from '../../hooks/useToast'
-import leadService from '../../services/mock/leadService'
-import conversationService from '../../services/mock/conversationService'
+import leadService from '../../services/api/leadService'
+import { getNuclearMode } from '../../services/api/superAdminDashboardService'
 import LeadLifecycle from './leads/LeadLifecycle'
 import AssignSalespersonModal from './leads/AssignSalespersonModal'
 import ChangeStatusModal from './leads/ChangeStatusModal'
@@ -39,11 +39,6 @@ import BuyOnlineCard from '../../components/leads/BuyOnlineCard'
 import VehicleVisualPackageCard from '../../components/leads/VehicleVisualPackageCard'
 import DealStatusStrip from '../../components/leads/DealStatusStrip'
 import StaffDealerFlow from '../../components/leads/StaffDealerFlow'
-import buyerGenomeService from '../../services/mock/buyerGenomeService'
-import nuclearModeService from '../../services/mock/nuclearModeService'
-import dealHandoffService from '../../services/mock/dealHandoffService'
-import visualPackageService from '../../services/mock/visualPackageService'
-import negotiationService from '../../services/mock/negotiationService'
 
 export default function LeadDetailPage() {
   const { id } = useParams()
@@ -73,35 +68,49 @@ export default function LeadDetailPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [leadData, conversation, genomeData, signalData, nuclearData, handoffData, packData, limits] =
+      const leadData = await leadService.getLeadById(id)
+      if (!leadData) {
+        setLead(null)
+        return
+      }
+
+      const [conversation, genomeData, signalData, nuclearData, handoffData, packData, limits, noteRows] =
         await Promise.all([
-          leadService.getLeadById(id),
-          conversationService.getConversation(id),
-          buyerGenomeService.getBuyerGenome(id),
-          buyerGenomeService.getBehaviorSignals(id),
-          nuclearModeService.getNuclearMode(),
-          dealHandoffService.getDealHandoffByLeadId(id),
-          visualPackageService.getVehicleVisualPackage(id),
-          negotiationService.getNegotiationLimits(),
+          leadService.getLeadConversation(id).catch(() => []),
+          leadService.getLeadGenome(id).catch(() => null),
+          leadService.getLeadBehaviorSignals(id).catch(() => []),
+          getNuclearMode().catch(() => null),
+          leadService.getLeadHandoff(id).catch(() => null),
+          leadService.getLeadVisualPackage(id).catch(() => null),
+          leadService.getNegotiationLimitsForLead().catch(() => []),
+          leadService.getLeadNotes(id).catch(() => []),
         ])
-      setLead(leadData)
-      setMessages(conversation)
+      setLead({
+        ...leadData,
+        notes: Array.isArray(noteRows) && noteRows.length ? noteRows : leadData.notes,
+      })
+      setMessages(Array.isArray(conversation) ? conversation : [])
       setGenome(genomeData)
-      setSignals(signalData)
+      setSignals(Array.isArray(signalData) ? signalData : [])
       setNuclear(nuclearData)
       setHandoff(handoffData)
       setVisualPack(packData)
       setNegotiation(
-        limits.find(
-          (row) =>
-            row.vin === handoffData?.vin ||
-            (leadData?.vehicle && row.vehicle.includes(leadData.vehicle.split(' ').slice(-1)[0])),
-        ) || null,
+        (Array.isArray(limits) ? limits : []).find((row) => {
+          if (row?.vin && row.vin === handoffData?.vin) return true
+          const token = leadData.vehicle?.split(' ').filter(Boolean).slice(-1)[0]
+          return Boolean(
+            token && typeof row?.vehicle === 'string' && row.vehicle.includes(token),
+          )
+        }) || null,
       )
+    } catch (err) {
+      setLead(null)
+      showToast(err.message || 'Unable to load lead.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showToast])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -115,8 +124,14 @@ export default function LeadDetailPage() {
   }, [messages, aiTyping])
 
   const refreshLead = async () => {
-    const leadData = await leadService.getLeadById(id)
-    setLead(leadData)
+    const [leadData, noteRows] = await Promise.all([
+      leadService.getLeadById(id),
+      leadService.getLeadNotes(id).catch(() => []),
+    ])
+    setLead({
+      ...leadData,
+      notes: Array.isArray(noteRows) && noteRows.length ? noteRows : leadData?.notes,
+    })
   }
 
   const sendMessage = async (e) => {
@@ -128,19 +143,27 @@ export default function LeadDetailPage() {
     setSending(true)
 
     try {
-      const userMessage = await conversationService.sendMessage(
-        lead.id,
-        text,
-        'customer',
-      )
-      setMessages((prev) => [...prev, userMessage])
+      const sent = await leadService.sendLeadConversationMessage(lead.id, text)
+      if (sent.userMessage && sent.userMessage !== true) {
+        setMessages((prev) => [...prev, sent.userMessage])
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { id: `local_${Date.now()}`, sender: 'customer', text, timestamp: '' },
+        ])
+      }
       showToast('Message sent.')
 
-      if (!lead.aiPaused) {
-        setAiTyping(true)
-        const reply = await conversationService.sendAiReply(lead.id, text)
-        setMessages((prev) => [...prev, reply])
+      if (sent.reply) {
+        setMessages((prev) => [...prev, sent.reply])
+      } else if (Array.isArray(sent.extra) && sent.extra.length) {
+        setMessages((prev) => [...prev, ...sent.extra])
+      } else if (!lead.aiPaused) {
+        const refreshed = await leadService.getLeadConversation(lead.id).catch(() => [])
+        if (refreshed.length) setMessages(refreshed)
       }
+    } catch (err) {
+      showToast(err.message || 'Unable to send message.', 'error')
     } finally {
       setAiTyping(false)
       setSending(false)
@@ -150,11 +173,12 @@ export default function LeadDetailPage() {
   const confirmPause = async () => {
     setPauseLoading(true)
     try {
-      await conversationService.pauseAI()
       await leadService.setLeadAiPaused(lead.id, true)
       await refreshLead()
       showToast('AI paused.')
       setPauseOpen(false)
+    } catch (err) {
+      showToast(err.message || 'Unable to pause AI.', 'error')
     } finally {
       setPauseLoading(false)
     }
@@ -163,10 +187,11 @@ export default function LeadDetailPage() {
   const resumeAi = async () => {
     setPauseLoading(true)
     try {
-      await conversationService.resumeAI()
       await leadService.setLeadAiPaused(lead.id, false)
       await refreshLead()
       showToast('AI resumed.')
+    } catch (err) {
+      showToast(err.message || 'Unable to resume AI.', 'error')
     } finally {
       setPauseLoading(false)
     }
@@ -186,7 +211,7 @@ export default function LeadDetailPage() {
         <Card>
           <h1 className="text-xl font-semibold">Lead not found</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            The requested lead does not exist in mock data.
+            The requested lead could not be loaded.
           </p>
           <Link to="/super-admin/leads" className="mt-4 inline-block">
             <Button variant="secondary">
@@ -200,6 +225,10 @@ export default function LeadDetailPage() {
   }
 
   const breakdown = lead.scoreBreakdown || {}
+  const timelineEvents = Array.isArray(lead.timelineEvents) ? lead.timelineEvents : []
+  const activityItems = Array.isArray(lead.activity) ? lead.activity : []
+  const notes = Array.isArray(lead.notes) ? lead.notes : []
+  const chatMessages = Array.isArray(messages) ? messages : []
 
   return (
     <div className="mx-auto w-full max-w-7xl">
@@ -286,7 +315,7 @@ export default function LeadDetailPage() {
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-5">
-            {messages.map((message) => {
+            {chatMessages.map((message) => {
               const isCustomer = message.sender === 'customer'
               const isAi = message.sender === 'ai'
               return (
@@ -398,20 +427,20 @@ export default function LeadDetailPage() {
             </dl>
           </Card>
 
-          <AcquisitionSignalsCard customerName={lead.customerName} />
+          <AcquisitionSignalsCard signals={lead.acquisitionSignals} />
 
           <BuyerGenomeCard genome={genome} />
           <BehavioralSignalsCard signals={signals} />
-          <GenomeTimeline events={genome?.timeline || []} />
+          <GenomeTimeline events={Array.isArray(genome?.timeline) ? genome.timeline : []} />
           <BuyOnlineCard
             nuclearOn={Boolean(nuclear?.enabled)}
             intent={genome?.intent}
             dealStatus={handoff?.dealStatus}
             vehicle={handoff?.vehicle || lead.vehicle}
           />
-          {genome?.intent === 'HIGH' && (
+          {visualPack ? (
             <VehicleVisualPackageCard pack={visualPack} />
-          )}
+          ) : null}
           {lead.source === 'Authorized Staff Social Account' && (
             <StaffDealerFlow showTransfer={handoff?.dealStatus === 'DEAL READY'} />
           )}
@@ -468,8 +497,8 @@ export default function LeadDetailPage() {
             <h2 className="text-base font-semibold">Lead Timeline</h2>
           </div>
           <ul className="space-y-3">
-            {(lead.timelineEvents || []).map((item) => (
-              <li key={item.id} className="flex gap-3">
+            {timelineEvents.map((item) => (
+              <li key={item.id || item.label} className="flex gap-3">
                 <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--brand-accent)]" />
                 <div>
                   <p className="text-sm font-medium">{item.label}</p>
@@ -491,9 +520,9 @@ export default function LeadDetailPage() {
             <h2 className="text-base font-semibold">Lead Activity</h2>
           </div>
           <ul className="space-y-3">
-            {(lead.activity || []).map((item) => (
+            {activityItems.map((item) => (
               <li
-                key={item.id}
+                key={item.id || item.description}
                 className="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-2"
               >
                 <p className="text-sm font-medium">{item.description}</p>
@@ -504,14 +533,14 @@ export default function LeadDetailPage() {
             ))}
           </ul>
 
-          {(lead.notes || []).length > 0 && (
+          {notes.length > 0 && (
             <div className="mt-5 border-t border-[var(--border-default)] pt-4">
               <div className="mb-2 flex items-center gap-2">
                 <StickyNote size={14} />
                 <h3 className="text-sm font-semibold">Notes</h3>
               </div>
               <ul className="space-y-2">
-                {lead.notes.map((note) => (
+                {notes.map((note) => (
                   <li
                     key={note.id}
                     className="rounded-[var(--radius-md)] bg-[var(--bg-muted)] px-3 py-2 text-sm"

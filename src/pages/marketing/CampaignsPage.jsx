@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
@@ -16,61 +16,87 @@ import CampaignCard from '../../components/marketing/CampaignCard'
 import PlatformBadge from '../../components/marketing/PlatformBadge'
 import { useToast } from '../../hooks/useToast'
 import { formatNumber } from '../../utils/table'
-import campaignService from '../../services/mock/campaignService'
 import {
   CAMPAIGN_OBJECTIVES,
   CAMPAIGN_STATUSES,
 } from '../../data/campaigns'
-import { DEALERSHIPS, SOCIAL_PLATFORMS, AUDIENCES } from '../../data/marketingContent'
+import { SOCIAL_PLATFORMS, AUDIENCES } from '../../data/marketingContent'
+import { getCampaigns, createCampaign } from '../../services/api/marketingCampaignService'
+
+const PAGE_SIZE = 8
+const SEARCH_DEBOUNCE_MS = 400
+
+const EMPTY_FORM = {
+  name: '',
+  dealershipId: 'dlr_miami',
+  objective: 'Lead Generation',
+  platforms: ['Facebook', 'Instagram'],
+  startDate: '2026-08-15',
+  endDate: '2026-09-30',
+  budget: '10000',
+  targetAudience: 'Luxury Buyer',
+  description: '',
+}
 
 export default function CampaignsPage() {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [rows, setRows] = useState([])
+  const [totalItems, setTotalItems] = useState(0)
+  const [dealerships, setDealerships] = useState([])
+  const [objectives, setObjectives] = useState(CAMPAIGN_OBJECTIVES)
+  const [platforms, setPlatforms] = useState(SOCIAL_PLATFORMS.filter((p) => p !== 'WhatsApp'))
+  const [audiences, setAudiences] = useState(AUDIENCES)
+  const [statuses, setStatuses] = useState(CAMPAIGN_STATUSES)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState('all')
+  const [page, setPage] = useState(1)
   const [createOpen, setCreateOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({
-    name: '',
-    dealership: DEALERSHIPS[0],
-    objective: CAMPAIGN_OBJECTIVES[0],
-    platforms: ['Instagram', 'Facebook'],
-    startDate: '2026-08-15',
-    endDate: '2026-09-30',
-    budget: '10000',
-    audience: AUDIENCES[0],
-    description: '',
-  })
+  const [form, setForm] = useState(EMPTY_FORM)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await campaignService.getCampaigns())
+      const result = await getCampaigns({
+        page,
+        limit: PAGE_SIZE,
+        search: debouncedSearch,
+        status,
+      })
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.options.dealerships?.length) setDealerships(result.options.dealerships)
+      if (result.options.objectives?.length) setObjectives(result.options.objectives)
+      if (result.options.platforms?.length) setPlatforms(result.options.platforms)
+      if (result.options.audiences?.length) setAudiences(result.options.audiences)
+      if (result.options.statuses?.length) setStatuses(result.options.statuses)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load campaigns.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, debouncedSearch, status, showToast])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
-
-  const filtered = useMemo(() => {
-    let list = rows
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.dealership.toLowerCase().includes(q),
-      )
-    }
-    if (status !== 'all') list = list.filter((r) => r.status === status)
-    return list
-  }, [rows, search, status])
 
   const togglePlatform = (platform) => {
     setForm((prev) => ({
@@ -88,7 +114,17 @@ export default function CampaignsPage() {
         title="Campaigns"
         description="Plan and monitor dealership marketing campaigns."
         actions={
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button
+            onClick={() => {
+              setForm({
+                ...EMPTY_FORM,
+                dealershipId: dealerships.find((d) => d.id === 'dlr_miami')?.id || dealerships[0]?.id || '',
+                objective: objectives[0] || 'Lead Generation',
+                targetAudience: audiences[0] || 'Luxury Buyer',
+              })
+              setCreateOpen(true)
+            }}
+          >
             <Plus size={16} />
             Create Campaign
           </Button>
@@ -104,10 +140,13 @@ export default function CampaignsPage() {
           />
           <Select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => {
+              setStatus(e.target.value)
+              setPage(1)
+            }}
             options={[
               { value: 'all', label: 'All statuses' },
-              ...CAMPAIGN_STATUSES.map((s) => ({ value: s, label: s })),
+              ...statuses.map((s) => ({ value: s, label: s })),
             ]}
           />
         </div>
@@ -129,7 +168,7 @@ export default function CampaignsPage() {
                     label: 'Platforms',
                     render: (row) => (
                       <div className="flex flex-wrap gap-1">
-                        {row.platforms.map((p) => (
+                        {(row.platforms || []).map((p) => (
                           <PlatformBadge key={p} platform={p} />
                         ))}
                       </div>
@@ -159,13 +198,17 @@ export default function CampaignsPage() {
                     ),
                   },
                 ]}
-                rows={filtered}
-                pageSize={8}
+                rows={rows}
+                page={page}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+                totalItems={totalItems}
+                showPagination
                 emptyTitle="No campaigns found."
               />
             </div>
             <div className="grid grid-cols-1 gap-3 md:hidden">
-              {filtered.map((campaign) => (
+              {rows.map((campaign) => (
                 <CampaignCard key={campaign.id} campaign={campaign} />
               ))}
             </div>
@@ -180,11 +223,14 @@ export default function CampaignsPage() {
             e.preventDefault()
             setSaving(true)
             try {
-              const created = await campaignService.createCampaign(form)
+              const created = await createCampaign(form)
               setCreateOpen(false)
+              setForm(EMPTY_FORM)
               showToast('Campaign created.')
               await load()
-              navigate(`/marketing/campaigns/${created.id}`)
+              if (created?.id) navigate(`/marketing/campaigns/${created.id}`)
+            } catch (err) {
+              showToast(err.message || 'Unable to create campaign.', 'error')
             } finally {
               setSaving(false)
             }
@@ -198,20 +244,20 @@ export default function CampaignsPage() {
           />
           <Select
             label="Dealership"
-            value={form.dealership}
-            onChange={(e) => setForm({ ...form, dealership: e.target.value })}
-            options={DEALERSHIPS.map((d) => ({ value: d, label: d }))}
+            value={form.dealershipId}
+            onChange={(e) => setForm({ ...form, dealershipId: e.target.value })}
+            options={dealerships.map((d) => ({ value: d.id, label: d.name }))}
           />
           <Select
             label="Objective"
             value={form.objective}
             onChange={(e) => setForm({ ...form, objective: e.target.value })}
-            options={CAMPAIGN_OBJECTIVES.map((d) => ({ value: d, label: d }))}
+            options={objectives.map((d) => ({ value: d, label: d }))}
           />
           <div>
             <p className="mb-1.5 text-sm font-medium">Platforms</p>
             <div className="flex flex-wrap gap-2">
-              {SOCIAL_PLATFORMS.filter((p) => p !== 'WhatsApp').map((p) => (
+              {platforms.map((p) => (
                 <Button
                   key={p}
                   type="button"
@@ -248,9 +294,9 @@ export default function CampaignsPage() {
           />
           <Select
             label="Target Audience"
-            value={form.audience}
-            onChange={(e) => setForm({ ...form, audience: e.target.value })}
-            options={AUDIENCES.map((d) => ({ value: d, label: d }))}
+            value={form.targetAudience}
+            onChange={(e) => setForm({ ...form, targetAudience: e.target.value })}
+            options={audiences.map((d) => ({ value: d, label: d }))}
           />
           <div>
             <label className="mb-1.5 block text-sm font-medium">Description</label>
@@ -264,7 +310,7 @@ export default function CampaignsPage() {
             <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving || form.platforms.length === 0}>
+            <Button type="submit" disabled={saving || form.platforms.length === 0 || !form.name.trim()}>
               {saving ? <LoadingSpinner size={16} /> : 'Save Campaign'}
             </Button>
           </div>

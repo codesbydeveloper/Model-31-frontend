@@ -22,7 +22,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import StatusBadge from '../../components/common/StatusBadge'
 import { formatNumber, sortBy } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
-import leadService from '../../services/mock/leadService'
+import leadService from '../../services/api/leadService'
 import { LEAD_SOURCES, LEAD_STATUSES, LEAD_TIERS } from '../../data/leads'
 import { PIPELINE_TYPES } from '../../utils/pipeline'
 import PipelineBadge from '../../components/common/PipelineBadge'
@@ -30,6 +30,9 @@ import AssignSalespersonModal from './leads/AssignSalespersonModal'
 import ChangeStatusModal from './leads/ChangeStatusModal'
 import AddNoteModal from './leads/AddNoteModal'
 import EditLeadModal from './leads/EditLeadModal'
+
+const PAGE_SIZE = 10
+const SEARCH_DEBOUNCE_MS = 400
 
 const STAT_CARDS = [
   { key: 'totalLeads', label: 'Total Leads', icon: Users },
@@ -66,10 +69,12 @@ export default function LeadsPage() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [sortKey, setSortKey] = useState('createdAt')
   const [sortDir, setSortDir] = useState('desc')
   const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [activeLead, setActiveLead] = useState(null)
   const [assignOpen, setAssignOpen] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
@@ -79,16 +84,34 @@ export default function LeadsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [leadRows, leadStats] = await Promise.all([
-        leadService.getLeads(),
-        leadService.getLeadStats(),
-      ])
-      setRows(leadRows)
-      setStats(leadStats)
+      const result = await leadService.getLeads({
+        page,
+        limit: PAGE_SIZE,
+        search: debouncedSearch,
+      })
+      setRows(result.items)
+      setStats(result.stats)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setStats(null)
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load leads.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, debouncedSearch, showToast])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -113,19 +136,6 @@ export default function LeadsPage() {
 
   const filtered = useMemo(() => {
     let list = rows
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (r) =>
-          r.customerName.toLowerCase().includes(q) ||
-          r.id.toLowerCase().includes(q) ||
-          r.vehicle.toLowerCase().includes(q) ||
-          r.dealership.toLowerCase().includes(q) ||
-          String(r.salesperson || '')
-            .toLowerCase()
-            .includes(q),
-      )
-    }
     if (filters.status !== 'all') {
       list = list.filter((r) => r.status === filters.status)
     }
@@ -156,7 +166,7 @@ export default function LeadsPage() {
       status: 'status',
     }
     return sortBy(list, keyMap[sortKey] || sortKey, sortDir)
-  }, [rows, search, filters, sortKey, sortDir])
+  }, [rows, filters, sortKey, sortDir])
 
   const clearFilters = () => {
     setSearch('')
@@ -231,10 +241,12 @@ export default function LeadsPage() {
     {
       key: 'actions',
       label: 'Actions',
+      cellClassName: 'relative overflow-visible',
       render: (row) => (
         <Dropdown
           label={<MoreHorizontal size={16} />}
-          className="[&_button]:px-2"
+          buttonClassName="h-8 w-8 px-0"
+          aria-label="Lead actions"
           items={[
             { label: 'View Lead', value: 'view' },
             { label: 'Edit Lead', value: 'edit' },
@@ -253,7 +265,7 @@ export default function LeadsPage() {
       <Breadcrumbs />
       <PageHeader
         title="Leads"
-        description="Manage, qualify and monitor customer leads across the AutoFlow platform."
+        description="Manage, qualify and monitor customer leads across the Model 31 platform."
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
@@ -271,10 +283,7 @@ export default function LeadsPage() {
         <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
           <SearchInput
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search customer, ID, vehicle…"
             className="xl:col-span-2"
           />
@@ -417,7 +426,9 @@ export default function LeadsPage() {
               }
             }}
             page={page}
-            pageSize={10}
+            pageSize={PAGE_SIZE}
+            totalItems={totalItems}
+            showPagination
             onPageChange={setPage}
             emptyTitle="No leads found."
             emptyDescription="Try adjusting your search or filters."

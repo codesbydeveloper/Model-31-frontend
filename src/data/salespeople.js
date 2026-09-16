@@ -2,7 +2,7 @@ export const initialSalespeople = [
   {
     id: 'sp_001',
     name: 'John Smith',
-    email: 'salesperson@autoflow.com',
+    email: 'salesperson@model31.com',
     status: 'ONLINE',
     currentLeads: 3,
     dealership: 'Miami Luxury Motors',

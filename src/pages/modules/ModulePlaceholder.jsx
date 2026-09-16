@@ -24,10 +24,10 @@ export default function ModulePlaceholder({
       description={
         description ||
         navItem?.description ||
-        'This area is reserved for an upcoming AutoFlow module.'
+        'This area is reserved for an upcoming Model 31 module.'
       }
       showActionPlaceholders={showActionPlaceholders}
-      nextStepNote="This module will be implemented in the next steps."
+      nextStepNote="Open a related page from the sidebar to continue."
     />
   )
 }

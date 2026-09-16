@@ -7,27 +7,50 @@ import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { formatNumber } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
-import integrationHealthService from '../../services/mock/integrationHealthService'
+import {
+  getIntegrationHealth,
+  runHealthCheck,
+} from '../../services/api/superAdminIntegrationHealthService'
 
 export default function IntegrationHealthPage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState([])
+  const [canRun, setCanRun] = useState(true)
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await integrationHealthService.getIntegrationHealth())
+      const result = await getIntegrationHealth()
+      setRows(result.integrations)
+      setCanRun(result.canRunHealthCheck)
+    } catch (err) {
+      setRows([])
+      showToast(err.message || 'Unable to load integration health.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
+
+  const onRunCheck = async () => {
+    setChecking(true)
+    try {
+      const result = await runHealthCheck()
+      setRows(result.integrations)
+      setCanRun(result.canRunHealthCheck)
+      showToast(result.message || 'Health check completed.')
+    } catch (err) {
+      showToast(err.message || 'Unable to run health check.', 'error')
+    } finally {
+      setChecking(false)
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl">
@@ -36,18 +59,7 @@ export default function IntegrationHealthPage() {
         title="Integration Health"
         description="Monitor the health of platform integrations and supporting services."
         actions={
-          <Button
-            disabled={checking}
-            onClick={async () => {
-              setChecking(true)
-              try {
-                setRows(await integrationHealthService.runHealthCheck())
-                showToast('Health check completed.')
-              } finally {
-                setChecking(false)
-              }
-            }}
-          >
+          <Button disabled={checking || !canRun} onClick={() => void onRunCheck()}>
             {checking ? (
               <>
                 <LoadingSpinner size={16} />
@@ -64,6 +76,12 @@ export default function IntegrationHealthPage() {
         <div className="flex justify-center py-16">
           <LoadingSpinner size={28} />
         </div>
+      ) : rows.length === 0 ? (
+        <Card>
+          <p className="py-10 text-center text-sm text-[var(--text-secondary)]">
+            No integrations found.
+          </p>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((item) => (
@@ -80,7 +98,7 @@ export default function IntegrationHealthPage() {
                 <div className="flex justify-between gap-2">
                   <dt className="text-[var(--text-muted)]">Latency</dt>
                   <dd className="font-medium">
-                    {item.latencyMs ? `${item.latencyMs} ms` : '—'}
+                    {item.latencyMs == null ? '—' : `${item.latencyMs} ms`}
                   </dd>
                 </div>
                 <div className="flex justify-between gap-2">

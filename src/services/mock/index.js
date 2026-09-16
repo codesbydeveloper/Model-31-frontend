@@ -1,5 +1,5 @@
 /**
- * Mock service foundation for AutoFlow.
+ * Mock service foundation for Model 31.
  * Real API calls will be added in later steps.
  */
 

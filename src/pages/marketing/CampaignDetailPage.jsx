@@ -11,41 +11,29 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import DataTable from '../../components/common/DataTable'
 import PlatformBadge from '../../components/marketing/PlatformBadge'
 import { formatNumber, formatPercent } from '../../utils/table'
-import campaignService from '../../services/mock/campaignService'
-import marketingContentService from '../../services/mock/marketingContentService'
-import scheduledPostService from '../../services/mock/scheduledPostService'
-import attributionService from '../../services/mock/attributionService'
+import { useToast } from '../../hooks/useToast'
+import { getCampaign } from '../../services/api/marketingCampaignService'
 
 const TABS = ['Overview', 'Content', 'Scheduled Posts', 'Performance', 'Attribution']
 
 export default function CampaignDetailPage() {
   const { id } = useParams()
+  const { showToast } = useToast()
   const [campaign, setCampaign] = useState(null)
   const [tab, setTab] = useState('Overview')
-  const [content, setContent] = useState([])
-  const [scheduled, setScheduled] = useState([])
-  const [attribution, setAttribution] = useState([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [c, allContent, posts, attr] = await Promise.all([
-        campaignService.getCampaignById(id),
-        marketingContentService.getContent(),
-        scheduledPostService.getScheduledPosts(),
-        attributionService.getAttributionData(),
-      ])
-      setCampaign(c)
-      if (c) {
-        setContent(allContent.filter((item) => item.campaign === c.name))
-        setScheduled(posts.filter((p) => p.campaign === c.name))
-        setAttribution(attr.rows.filter((r) => r.campaign === c.name))
-      }
+      setCampaign(await getCampaign(id))
+    } catch (err) {
+      setCampaign(null)
+      showToast(err.message || 'Unable to load campaign.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -69,6 +57,14 @@ export default function CampaignDetailPage() {
         </Link>
       </Card>
     )
+  }
+
+  const stats = campaign.stats || {
+    reach: 0,
+    engagement: 0,
+    leads: 0,
+    appointments: 0,
+    soldDeals: 0,
   }
 
   return (
@@ -113,7 +109,7 @@ export default function CampaignDetailPage() {
                 label="Platforms"
                 value={
                   <div className="flex flex-wrap justify-end gap-1">
-                    {campaign.platforms.map((p) => (
+                    {(campaign.platforms || []).map((p) => (
                       <PlatformBadge key={p} platform={p} />
                     ))}
                   </div>
@@ -124,11 +120,11 @@ export default function CampaignDetailPage() {
             <p className="mt-3 text-sm text-[var(--text-secondary)]">{campaign.description}</p>
           </Card>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <StatCard label="Reach" value={formatNumber(campaign.stats.reach)} />
-            <StatCard label="Engagement" value={formatPercent(campaign.stats.engagement)} />
-            <StatCard label="Leads" value={formatNumber(campaign.stats.leads)} />
-            <StatCard label="Appointments" value={formatNumber(campaign.stats.appointments)} />
-            <StatCard label="Sold Deals" value={formatNumber(campaign.stats.soldDeals)} />
+            <StatCard label="Reach" value={formatNumber(stats.reach)} />
+            <StatCard label="Engagement" value={formatPercent(stats.engagement)} />
+            <StatCard label="Leads" value={formatNumber(stats.leads)} />
+            <StatCard label="Appointments" value={formatNumber(stats.appointments)} />
+            <StatCard label="Sold Deals" value={formatNumber(stats.soldDeals)} />
           </div>
         </>
       )}
@@ -150,7 +146,7 @@ export default function CampaignDetailPage() {
                 render: (row) => <StatusBadge status={row.status} />,
               },
             ]}
-            rows={content}
+            rows={campaign.content || []}
             pageSize={8}
             emptyTitle="No content linked to this campaign."
           />
@@ -175,7 +171,7 @@ export default function CampaignDetailPage() {
                 render: (row) => <StatusBadge status={row.status} />,
               },
             ]}
-            rows={scheduled}
+            rows={campaign.scheduledPosts || []}
             pageSize={8}
             emptyTitle="No scheduled posts for this campaign."
           />
@@ -184,11 +180,11 @@ export default function CampaignDetailPage() {
 
       {tab === 'Performance' && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <StatCard label="Reach" value={formatNumber(campaign.stats.reach)} />
-          <StatCard label="Engagement" value={formatPercent(campaign.stats.engagement)} />
-          <StatCard label="Leads" value={formatNumber(campaign.stats.leads)} />
-          <StatCard label="Appointments" value={formatNumber(campaign.stats.appointments)} />
-          <StatCard label="Sold Deals" value={formatNumber(campaign.stats.soldDeals)} />
+          <StatCard label="Reach" value={formatNumber(stats.reach)} />
+          <StatCard label="Engagement" value={formatPercent(stats.engagement)} />
+          <StatCard label="Leads" value={formatNumber(stats.leads)} />
+          <StatCard label="Appointments" value={formatNumber(stats.appointments)} />
+          <StatCard label="Sold Deals" value={formatNumber(stats.soldDeals)} />
         </div>
       )}
 
@@ -208,7 +204,7 @@ export default function CampaignDetailPage() {
                 render: (row) => `$${formatNumber(row.revenue)}`,
               },
             ]}
-            rows={attribution}
+            rows={campaign.attribution || []}
             pageSize={8}
             emptyTitle="No attribution rows for this campaign."
           />

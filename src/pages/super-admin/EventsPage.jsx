@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
@@ -10,48 +10,91 @@ import DataTable from '../../components/common/DataTable'
 import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import Modal from '../../components/common/Modal'
-import eventService from '../../services/mock/eventService'
-import { EVENT_TYPES, EVENT_STATUSES } from '../../data/events'
+import { useToast } from '../../hooks/useToast'
+import {
+  FALLBACK_OPTIONS,
+  getEventQuickView,
+  getEvents,
+} from '../../services/api/superAdminEventService'
+
+const PAGE_SIZE = 10
+const SEARCH_DEBOUNCE_MS = 400
 
 export default function EventsPage() {
+  const { showToast } = useToast()
   const [rows, setRows] = useState([])
+  const [options, setOptions] = useState(FALLBACK_OPTIONS)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [type, setType] = useState('all')
-  const [status, setStatus] = useState('all')
-  const [source, setSource] = useState('all')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [eventType, setEventType] = useState('')
+  const [status, setStatus] = useState('')
+  const [source, setSource] = useState('')
   const [date, setDate] = useState('')
   const [detail, setDetail] = useState(null)
+  const [quickOpen, setQuickOpen] = useState(false)
+  const [quickLoading, setQuickLoading] = useState(false)
   const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await eventService.getEvents())
+      const result = await getEvents({
+        search: debouncedSearch,
+        eventType,
+        status,
+        source,
+        date,
+        page,
+        limit: PAGE_SIZE,
+      })
+      setRows(result.items)
+      setOptions(result.options)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load events.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [debouncedSearch, eventType, status, source, date, page, showToast])
 
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 0)
-    return () => window.clearTimeout(t)
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0)
+    return () => window.clearTimeout(timer)
   }, [load])
 
-  const sources = useMemo(() => [...new Set(rows.map((r) => r.source))].sort(), [rows])
+  const onFilterChange = (setter) => (event) => {
+    setter(event.target.value)
+    setPage(1)
+  }
 
-  const filtered = useMemo(() => {
-    let list = rows
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter((r) => r.id.toLowerCase().includes(q))
+  const openQuickView = async (row) => {
+    setQuickOpen(true)
+    setQuickLoading(true)
+    setDetail(null)
+    try {
+      setDetail(await getEventQuickView(row.id))
+    } catch (err) {
+      showToast(err.message || 'Unable to load event quick view.', 'error')
+      setQuickOpen(false)
+    } finally {
+      setQuickLoading(false)
     }
-    if (type !== 'all') list = list.filter((r) => r.eventType === type)
-    if (status !== 'all') list = list.filter((r) => r.status === status)
-    if (source !== 'all') list = list.filter((r) => r.source === source)
-    if (date) list = list.filter((r) => r.created.startsWith(date))
-    return list
-  }, [rows, search, type, status, source, date])
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl">
@@ -64,41 +107,29 @@ export default function EventsPage() {
         <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-5">
           <SearchInput
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search Event ID..."
           />
           <Select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            options={[
-              { value: 'all', label: 'All event types' },
-              ...EVENT_TYPES.map((t) => ({ value: t, label: t })),
-            ]}
+            value={eventType}
+            onChange={onFilterChange(setEventType)}
+            options={options.eventTypes}
           />
           <Select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            options={[
-              { value: 'all', label: 'All statuses' },
-              ...EVENT_STATUSES.map((t) => ({ value: t, label: t })),
-            ]}
+            onChange={onFilterChange(setStatus)}
+            options={options.statuses}
           />
           <Select
             value={source}
-            onChange={(e) => setSource(e.target.value)}
-            options={[
-              { value: 'all', label: 'All sources' },
-              ...sources.map((s) => ({ value: s, label: s })),
-            ]}
+            onChange={onFilterChange(setSource)}
+            options={options.sources}
           />
           <input
             type="date"
             className="input-field"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={onFilterChange(setDate)}
             aria-label="Filter by date"
           />
         </div>
@@ -134,7 +165,7 @@ export default function EventsPage() {
                 label: 'Action',
                 render: (row) => (
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => setDetail(row)}>
+                    <Button size="sm" onClick={() => void openQuickView(row)}>
                       Quick view
                     </Button>
                     <Link
@@ -147,42 +178,48 @@ export default function EventsPage() {
                 ),
               },
             ]}
-            rows={filtered}
+            rows={rows}
             page={page}
             onPageChange={setPage}
-            pageSize={10}
+            pageSize={PAGE_SIZE}
+            totalItems={totalItems}
+            showPagination
             emptyTitle="No events found."
           />
         )}
       </Card>
 
       <Modal
-        open={Boolean(detail)}
-        onClose={() => setDetail(null)}
-        title="Event Details"
+        open={quickOpen}
+        onClose={() => !quickLoading && setQuickOpen(false)}
+        title={detail?.title || 'Event Details'}
         className="max-w-lg"
       >
-        {detail && (
+        {quickLoading || !detail ? (
+          <div className="flex justify-center py-8">
+            <LoadingSpinner size={24} />
+          </div>
+        ) : (
           <dl className="space-y-2 text-sm">
             <Row label="Event ID" value={detail.id} />
             <Row label="Event Type" value={detail.eventType} />
             <Row label="Timestamp" value={detail.created} />
             <Row label="Source" value={detail.source} />
             <Row label="Entity" value={detail.entity} />
-            <Row label="Payload Summary" value={detail.payloadSummary} />
+            <Row label="Payload Summary" value={detail.payloadSummary || '—'} />
             <Row label="Processing Status" value={detail.status} />
             <Row
               label="Duration"
               value={detail.durationMs == null ? '—' : `${detail.durationMs} ms`}
             />
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="secondary" onClick={() => setDetail(null)}>
+              <Button variant="secondary" onClick={() => setQuickOpen(false)}>
                 Close
               </Button>
               <Link
                 to={`/super-admin/events/${detail.id}`}
                 className="btn btn-sm btn-primary inline-flex items-center"
-                onClick={() => setDetail(null)}
+                onClick={() => setQuickOpen(false)}
               >
                 Full details
               </Link>

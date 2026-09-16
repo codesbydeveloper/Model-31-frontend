@@ -3,6 +3,16 @@ import { cn } from '../../utils/cn'
 import Button from './Button'
 import EmptyState from '../ui/EmptyState'
 
+function visiblePages(current, total) {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, index) => index + 1)
+  }
+
+  const start = Math.max(1, Math.min(current - 2, total - 4))
+  const end = Math.min(total, start + 4)
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index)
+}
+
 /**
  * Responsive data table: desktop table + mobile card list.
  */
@@ -20,12 +30,20 @@ export default function DataTable({
   page = 1,
   pageSize = 8,
   onPageChange,
+  totalItems,
+  showPagination = false,
   className = '',
 }) {
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
-  const currentPage = Math.min(page, totalPages)
+  const serverPagination = typeof totalItems === 'number'
+  const totalCount = serverPagination ? totalItems : rows.length
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+  const currentPage = Math.min(Math.max(1, page), totalPages)
   const start = (currentPage - 1) * pageSize
-  const pageRows = rows.slice(start, start + pageSize)
+  const pageRows = serverPagination ? rows : rows.slice(start, start + pageSize)
+  const from = totalCount === 0 ? 0 : start + 1
+  const to = serverPagination
+    ? start + pageRows.length
+    : Math.min(start + pageSize, totalCount)
 
   if (!rows.length) {
     return (
@@ -106,13 +124,12 @@ export default function DataTable({
         ))}
       </div>
 
-      {rows.length > pageSize && (
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--border-default)] pt-4">
+      {(showPagination || totalCount > pageSize) && (
+        <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border-default)] pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-[var(--text-secondary)]">
-            Showing {start + 1}–{Math.min(start + pageSize, rows.length)} of{' '}
-            {rows.length}
+            Showing {from}–{to} of {totalCount}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="secondary"
               size="sm"
@@ -121,10 +138,20 @@ export default function DataTable({
               aria-label="Previous page"
             >
               <ChevronLeft size={16} />
+              Previous
             </Button>
-            <span className="text-xs text-[var(--text-secondary)]">
-              {currentPage} / {totalPages}
-            </span>
+            {visiblePages(currentPage, totalPages).map((pageNumber) => (
+              <Button
+                key={pageNumber}
+                variant={pageNumber === currentPage ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => onPageChange?.(pageNumber)}
+                aria-current={pageNumber === currentPage ? 'page' : undefined}
+                aria-label={`Page ${pageNumber}`}
+              >
+                {pageNumber}
+              </Button>
+            ))}
             <Button
               variant="secondary"
               size="sm"
@@ -132,6 +159,7 @@ export default function DataTable({
               onClick={() => onPageChange?.(currentPage + 1)}
               aria-label="Next page"
             >
+              Next
               <ChevronRight size={16} />
             </Button>
           </div>

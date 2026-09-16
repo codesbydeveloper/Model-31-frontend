@@ -22,6 +22,7 @@ export function statusVariant(status = '') {
       'completed',
       'paid',
       'approved',
+      'edited',
       'published',
       'healthy',
       'processed',
@@ -37,6 +38,8 @@ export function statusVariant(status = '') {
       'manager accepted',
       'closed',
       'direct',
+      '✓ in good standing',
+      'in good standing',
     ].includes(value)
   ) {
     return 'ready'
@@ -55,6 +58,8 @@ export function statusVariant(status = '') {
       'b',
       'tier b',
       'medium',
+      'review required',
+      '⚠ review required',
       'warning',
       'waiting',
       'contacted',

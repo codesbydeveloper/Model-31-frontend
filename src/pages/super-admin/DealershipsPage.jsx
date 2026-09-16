@@ -14,8 +14,11 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import StatusBadge from '../../components/common/StatusBadge'
 import { formatNumber, sortBy } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
-import dealershipService from '../../services/mock/dealershipService'
+import dealershipService from '../../services/api/dealershipService'
 import { TIMEZONES } from '../../data/settings'
+
+const PAGE_SIZE = 10
+const SEARCH_DEBOUNCE_MS = 400
 
 const EMPTY_FORM = {
   name: '',
@@ -44,6 +47,7 @@ export default function DealershipsPage() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [cityFilter, setCityFilter] = useState('all')
   const [crmFilter, setCrmFilter] = useState('all')
@@ -51,6 +55,7 @@ export default function DealershipsPage() {
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
   const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -60,12 +65,33 @@ export default function DealershipsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await dealershipService.getDealerships()
-      setRows(data)
+      const result = await dealershipService.getDealerships({
+        page,
+        limit: PAGE_SIZE,
+        search: debouncedSearch,
+        status: statusFilter,
+      })
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load dealerships.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, debouncedSearch, statusFilter, showToast])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -81,32 +107,13 @@ export default function DealershipsPage() {
 
   const filtered = useMemo(() => {
     let list = rows
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.city.toLowerCase().includes(q) ||
-          r.state.toLowerCase().includes(q),
-      )
-    }
-    if (statusFilter !== 'all') list = list.filter((r) => r.status === statusFilter)
     if (cityFilter !== 'all') list = list.filter((r) => r.city === cityFilter)
     if (crmFilter !== 'all') list = list.filter((r) => r.crmStatus === crmFilter)
     if (socialFilter !== 'all') {
       list = list.filter((r) => r.socialStatus === socialFilter)
     }
     return sortBy(list, sortKey, sortDir)
-  }, [
-    rows,
-    search,
-    statusFilter,
-    cityFilter,
-    crmFilter,
-    socialFilter,
-    sortKey,
-    sortDir,
-  ])
+  }, [rows, cityFilter, crmFilter, socialFilter, sortKey, sortDir])
 
   const openCreate = () => {
     setEditing(null)
@@ -125,7 +132,7 @@ export default function DealershipsPage() {
       zip: row.zip,
       phone: row.phone,
       website: row.website,
-      brands: row.brands.join(', '),
+      brands: Array.isArray(row.brands) ? row.brands.join(', ') : row.brands || '',
       timezone: row.timezone,
       status: row.status,
     })
@@ -149,20 +156,30 @@ export default function DealershipsPage() {
         showToast('Dealership added successfully.')
       }
       setModalOpen(false)
-      await load()
+      if (editing || page === 1) {
+        await load()
+      } else {
+        setPage(1)
+      }
+    } catch (err) {
+      showToast(err.message || 'Unable to save dealership.', 'error')
     } finally {
       setSaving(false)
     }
   }
 
   const toggleStatus = async (row) => {
-    await dealershipService.toggleDealershipStatus(row.id)
-    showToast(
-      row.status === 'Active'
-        ? 'Dealership disabled.'
-        : 'Dealership enabled.',
-    )
-    await load()
+    try {
+      await dealershipService.toggleDealershipStatus(row.id, row.status)
+      showToast(
+        row.status === 'Active'
+          ? 'Dealership disabled.'
+          : 'Dealership enabled.',
+      )
+      await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to update dealership status.', 'error')
+    }
   }
 
   const columns = [
@@ -182,7 +199,7 @@ export default function DealershipsPage() {
     {
       key: 'brands',
       label: 'Brands',
-      render: (row) => row.brands.join(', '),
+      render: (row) => (row.brands || []).join(', '),
     },
     {
       key: 'salespeople',
@@ -243,7 +260,7 @@ export default function DealershipsPage() {
       <Breadcrumbs />
       <PageHeader
         title="Dealerships"
-        description="Manage dealerships connected to the AutoFlow platform."
+        description="Manage dealerships connected to the Model 31 platform."
         actions={
           <Button onClick={openCreate}>
             <Plus size={16} />
@@ -256,10 +273,7 @@ export default function DealershipsPage() {
         <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
           <SearchInput
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search dealerships"
             className="lg:col-span-2"
           />
@@ -333,6 +347,9 @@ export default function DealershipsPage() {
               }
             }}
             page={page}
+            pageSize={PAGE_SIZE}
+            totalItems={totalItems}
+            showPagination
             onPageChange={setPage}
             emptyTitle="No dealerships found."
             emptyDescription="Add a dealership to get started."

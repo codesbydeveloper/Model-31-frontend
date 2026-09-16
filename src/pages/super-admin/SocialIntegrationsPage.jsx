@@ -20,18 +20,30 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import StatusBadge from '../../components/common/StatusBadge'
 import { formatNumber } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
-import integrationService from '../../services/mock/integrationService'
-import socialService from '../../services/mock/socialService'
 import DataTable from '../../components/common/DataTable'
 import Toggle from '../../components/common/Toggle'
+import {
+  connectPlatform,
+  disconnectPlatform,
+  getPlatformSettings,
+  getSocialIntegrations,
+  setStaffModel31Source,
+} from '../../services/api/superAdminSocialService'
 
 const ICONS = {
+  facebook: Share2,
   Facebook: Share2,
+  instagram: Camera,
   Instagram: Camera,
+  whatsapp: MessageCircle,
   WhatsApp: MessageCircle,
+  tiktok: Music2,
   TikTok: Music2,
+  youtube: Video,
   YouTube: Video,
+  x: AtSign,
   X: AtSign,
+  whatnot: ShoppingBag,
   Whatnot: ShoppingBag,
 }
 
@@ -39,23 +51,33 @@ export default function SocialIntegrationsPage() {
   const { showToast } = useToast()
   const [items, setItems] = useState([])
   const [accounts, setAccounts] = useState([])
+  const [staffTitle, setStaffTitle] = useState('Authorized Staff Social Accounts')
+  const [staffDescription, setStaffDescription] = useState(
+    'Engagement from accounts with Model 31 Source ON is treated as a Model 31 source.',
+  )
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState(null)
+  const [togglingId, setTogglingId] = useState(null)
   const [settingsTarget, setSettingsTarget] = useState(null)
+  const [settings, setSettings] = useState(null)
+  const [settingsLoading, setSettingsLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [platforms, socialAccounts] = await Promise.all([
-        integrationService.getSocialIntegrations(),
-        socialService.getSocialAccounts(),
-      ])
-      setItems(platforms)
-      setAccounts(socialAccounts)
+      const result = await getSocialIntegrations()
+      setItems(result.platforms)
+      setAccounts(result.staffAccounts)
+      setStaffTitle(result.staffTitle)
+      setStaffDescription(result.staffDescription)
+    } catch (err) {
+      setItems([])
+      setAccounts([])
+      showToast(err.message || 'Unable to load social integrations.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -64,25 +86,60 @@ export default function SocialIntegrationsPage() {
     return () => window.clearTimeout(timer)
   }, [load])
 
-  const connect = async (id) => {
-    setBusyId(id)
+  const connect = async (item) => {
+    setBusyId(item.slug)
     try {
-      await integrationService.connectSocial(id)
-      showToast('Social platform connected successfully.')
+      const result = await connectPlatform(item.slug)
+      showToast(result.message || 'Social platform connected successfully.')
       await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to connect platform.', 'error')
     } finally {
       setBusyId(null)
     }
   }
 
-  const disconnect = async (id) => {
-    setBusyId(id)
+  const disconnect = async (item) => {
+    setBusyId(item.slug)
     try {
-      await integrationService.disconnectSocial(id)
-      showToast('Social platform disconnected.')
+      const result = await disconnectPlatform(item.slug)
+      showToast(result.message || 'Social platform disconnected.')
       await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to disconnect platform.', 'error')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  const openSettings = async (item) => {
+    setSettingsTarget(item)
+    setSettings(null)
+    setSettingsLoading(true)
+    try {
+      setSettings(await getPlatformSettings(item.slug))
+    } catch (err) {
+      showToast(err.message || 'Unable to load settings.', 'error')
+      setSettings({
+        title: `${item.name} Settings`,
+        placeholder: 'Connect this account to manage inbox and posting settings.',
+        account: null,
+      })
+    } finally {
+      setSettingsLoading(false)
+    }
+  }
+
+  const toggleSource = async (row, next) => {
+    setTogglingId(row.id)
+    try {
+      await setStaffModel31Source(row.id, next)
+      showToast('Social source setting updated.')
+      await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to update Model 31 source.', 'error')
+    } finally {
+      setTogglingId(null)
     }
   }
 
@@ -98,12 +155,18 @@ export default function SocialIntegrationsPage() {
         <div className="flex justify-center py-16">
           <LoadingSpinner size={28} />
         </div>
+      ) : items.length === 0 ? (
+        <Card>
+          <p className="py-8 text-center text-sm text-[var(--text-secondary)]">
+            No social platforms found.
+          </p>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {items.map((item) => {
-            const Icon = ICONS[item.name] || MessageCircle
+            const Icon = ICONS[item.icon] || ICONS[item.name] || MessageCircle
             return (
-              <Card key={item.id}>
+              <Card key={item.slug || item.id}>
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]">
                     <Icon size={18} />
@@ -129,38 +192,33 @@ export default function SocialIntegrationsPage() {
                 </dl>
 
                 <div className="mt-5 flex flex-wrap gap-2">
-                  {item.connectionStatus !== 'Connected' ? (
+                  {item.canConnect ? (
                     <Button
                       size="sm"
-                      disabled={busyId === item.id}
-                      onClick={() => connect(item.id)}
+                      disabled={busyId === item.slug}
+                      onClick={() => connect(item)}
                     >
-                      {busyId === item.id ? (
-                        <LoadingSpinner size={14} />
-                      ) : (
-                        <Link2 size={14} />
-                      )}
+                      {busyId === item.slug ? <LoadingSpinner size={14} /> : <Link2 size={14} />}
                       Connect
                     </Button>
-                  ) : (
+                  ) : null}
+                  {item.canDisconnect ? (
                     <Button
                       size="sm"
                       variant="ghost"
-                      disabled={busyId === item.id}
-                      onClick={() => disconnect(item.id)}
+                      disabled={busyId === item.slug}
+                      onClick={() => disconnect(item)}
                     >
-                      <Unplug size={14} />
+                      {busyId === item.slug ? <LoadingSpinner size={14} /> : <Unplug size={14} />}
                       Disconnect
                     </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setSettingsTarget(item)}
-                  >
-                    <Settings size={14} />
-                    Settings
-                  </Button>
+                  ) : null}
+                  {item.canSettings ? (
+                    <Button size="sm" variant="secondary" onClick={() => openSettings(item)}>
+                      <Settings size={14} />
+                      Settings
+                    </Button>
+                  ) : null}
                 </div>
               </Card>
             )
@@ -169,10 +227,8 @@ export default function SocialIntegrationsPage() {
       )}
 
       <Card className="mt-5">
-        <h2 className="mb-2 text-base font-semibold">Authorized Staff Social Accounts</h2>
-        <p className="mb-4 text-sm text-[var(--text-secondary)]">
-          Engagement from accounts with Model 31 Source ON is treated as a Model 31 source.
-        </p>
+        <h2 className="mb-2 text-base font-semibold">{staffTitle}</h2>
+        <p className="mb-4 text-sm text-[var(--text-secondary)]">{staffDescription}</p>
         {loading ? (
           <div className="flex justify-center py-10">
             <LoadingSpinner size={24} />
@@ -197,13 +253,8 @@ export default function SocialIntegrationsPage() {
                     />
                     <Toggle
                       checked={Boolean(row.model31_social_source)}
-                      onChange={async (next) => {
-                        await socialService.updateSocialSettings(row.id, {
-                          model31_social_source: next,
-                        })
-                        showToast('Social source setting updated.')
-                        await load()
-                      }}
+                      disabled={togglingId === row.id}
+                      onChange={(next) => void toggleSource(row, next)}
                     />
                   </div>
                 ),
@@ -223,18 +274,36 @@ export default function SocialIntegrationsPage() {
 
       <Modal
         open={Boolean(settingsTarget)}
-        onClose={() => setSettingsTarget(null)}
-        title={`${settingsTarget?.name || 'Social'} Settings`}
+        onClose={() => !settingsLoading && setSettingsTarget(null)}
+        title={settings?.title || `${settingsTarget?.name || 'Social'} Settings`}
       >
-        <p className="text-sm text-[var(--text-secondary)]">
-          OAuth and publishing settings will be connected in a later step. This
-          modal is a simulated placeholder for {settingsTarget?.name}.
-        </p>
-        <div className="mt-4 flex justify-end">
-          <Button variant="secondary" onClick={() => setSettingsTarget(null)}>
-            Close
-          </Button>
-        </div>
+        {settingsLoading ? (
+          <div className="flex justify-center py-8">
+            <LoadingSpinner size={24} />
+          </div>
+        ) : (
+          <>
+            {settings?.account?.name ? (
+              <p className="mb-3 text-sm">
+                <span className="font-medium">{settings.account.name}</span>
+                {settings.account.status ? (
+                  <span className="ml-2 text-[var(--text-secondary)]">
+                    · {settings.account.status}
+                  </span>
+                ) : null}
+              </p>
+            ) : null}
+            <p className="text-sm text-[var(--text-secondary)]">
+              {settings?.placeholder ||
+                'Connect this account to manage inbox and posting settings.'}
+            </p>
+            <div className="mt-4 flex justify-end">
+              <Button variant="secondary" onClick={() => setSettingsTarget(null)}>
+                Close
+              </Button>
+            </div>
+          </>
+        )}
       </Modal>
     </div>
   )

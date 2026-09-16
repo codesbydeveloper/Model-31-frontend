@@ -24,7 +24,7 @@ function BrandMark({ collapsed }) {
       )}
     >
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-white/10 text-sm font-bold tracking-tight text-white">
-        AF
+        31
       </div>
       {!collapsed && (
         <div className="min-w-0 flex-1 overflow-hidden">

@@ -9,21 +9,26 @@ import StatCard from '../../../components/common/StatCard'
 import StatusBadge from '../../../components/common/StatusBadge'
 import LoadingSpinner from '../../../components/common/LoadingSpinner'
 import { formatNumber } from '../../../utils/table'
-import communityService from '../../../services/mock/communityService'
+import { useToast } from '../../../hooks/useToast'
+import { getCommunity } from '../../../services/api/marketingCommunityService'
 
 export default function CommunityDetailPage() {
   const { id } = useParams()
+  const { showToast } = useToast()
   const [community, setCommunity] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setCommunity(await communityService.getCommunityDetails(id))
+      setCommunity(await getCommunity(id))
+    } catch (err) {
+      setCommunity(null)
+      showToast(err.message || 'Unable to load community.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -70,7 +75,7 @@ export default function CommunityDetailPage() {
         <StatCard label="Audience" value={formatNumber(community.audience)} />
         <StatCard label="Engagement" value={formatNumber(community.engagement)} />
         <StatCard label="Leads" value={formatNumber(community.leads)} />
-        <StatCard label="Qualified" value={formatNumber(community.qualifiedLeads)} />
+        <StatCard label="Qualified" value={formatNumber(community.qualified)} />
         <StatCard label="Appointments" value={formatNumber(community.appointments)} />
       </div>
 

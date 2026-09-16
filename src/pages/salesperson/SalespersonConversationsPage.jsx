@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Bot, UserRound, Send } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
@@ -7,13 +8,13 @@ import Button from '../../components/common/Button'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import StatusBadge from '../../components/common/StatusBadge'
 import { useToast } from '../../hooks/useToast'
-import salespersonService from '../../services/mock/salespersonService'
-import conversationService from '../../services/mock/conversationService'
+import salespersonConversationService from '../../services/api/salespersonConversationService'
 
 export default function SalespersonConversationsPage() {
   const { showToast } = useToast()
+  const [params] = useSearchParams()
   const [leads, setLeads] = useState([])
-  const [selectedId, setSelectedId] = useState('')
+  const [selectedId, setSelectedId] = useState(params.get('lead') || '')
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(true)
@@ -22,13 +23,32 @@ export default function SalespersonConversationsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const rows = await salespersonService.getMyLeads('sp_001')
+      const rows = await salespersonConversationService.getSalespersonConversations()
       setLeads(rows)
-      setSelectedId(rows[0]?.id || '')
+      setSelectedId((current) => current || params.get('lead') || rows[0]?.id || '')
+    } catch (err) {
+      setLeads([])
+      showToast(err.message || 'Unable to load conversations.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [params, showToast])
+
+  const loadThread = useCallback(
+    async (leadId) => {
+      if (!leadId) {
+        setMessages([])
+        return
+      }
+      try {
+        setMessages(await salespersonConversationService.getSalespersonConversation(leadId))
+      } catch (err) {
+        setMessages([])
+        showToast(err.message || 'Unable to load messages.', 'error')
+      }
+    },
+    [showToast],
+  )
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -37,16 +57,9 @@ export default function SalespersonConversationsPage() {
 
   useEffect(() => {
     if (!selectedId) return undefined
-    let active = true
-    const t = window.setTimeout(async () => {
-      const msgs = await conversationService.getConversation(selectedId)
-      if (active) setMessages(msgs)
-    }, 0)
-    return () => {
-      active = false
-      window.clearTimeout(t)
-    }
-  }, [selectedId])
+    const t = window.setTimeout(() => void loadThread(selectedId), 0)
+    return () => window.clearTimeout(t)
+  }, [selectedId, loadThread])
 
   const selected = useMemo(
     () => leads.find((item) => item.id === selectedId) || null,
@@ -58,14 +71,12 @@ export default function SalespersonConversationsPage() {
     if (!draft.trim() || !selectedId) return
     setSending(true)
     try {
-      const msg = await conversationService.sendMessage(
-        selectedId,
-        draft.trim(),
-        'agent',
-      )
-      setMessages((prev) => [...prev, msg])
+      await salespersonConversationService.sendSalespersonMessage(selectedId, draft.trim())
       setDraft('')
       showToast('Message sent.')
+      await loadThread(selectedId)
+    } catch (err) {
+      showToast(err.message || 'Unable to send message.', 'error')
     } finally {
       setSending(false)
     }
@@ -128,7 +139,8 @@ export default function SalespersonConversationsPage() {
 
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {messages.map((message) => {
-              const mine = message.sender !== 'customer'
+              const sender = String(message.sender || '').toLowerCase()
+              const mine = sender !== 'customer' && sender !== 'lead'
               return (
                 <div
                   key={message.id}
@@ -144,9 +156,9 @@ export default function SalespersonConversationsPage() {
                     <div className="mb-1 flex items-center gap-1 text-[11px] opacity-80">
                       {mine ? <Bot size={12} /> : <UserRound size={12} />}
                       <span>
-                        {message.sender === 'customer'
+                        {sender === 'customer' || sender === 'lead'
                           ? 'Customer'
-                          : message.sender === 'ai'
+                          : sender === 'ai'
                             ? 'AI'
                             : 'Salesperson'}
                       </span>
@@ -165,7 +177,7 @@ export default function SalespersonConversationsPage() {
           >
             <input
               className="input-field"
-              placeholder='Hi Sarah, this is John from Miami Luxury Motors.'
+              placeholder="Type a message..."
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
             />

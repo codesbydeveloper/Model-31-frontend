@@ -12,11 +12,21 @@ import ConfirmModal from '../../components/common/ConfirmModal'
 import ContentPreview from '../../components/marketing/ContentPreview'
 import PlatformBadge from '../../components/marketing/PlatformBadge'
 import { useToast } from '../../hooks/useToast'
-import marketingContentService from '../../services/mock/marketingContentService'
+import {
+  getApprovalQueue,
+  getApprovalItem,
+  approveApprovalItem,
+  rejectApprovalItem,
+  requestApprovalChanges,
+} from '../../services/api/marketingApprovalService'
+
+const PAGE_SIZE = 10
 
 export default function ApprovalQueuePage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState([])
+  const [totalItems, setTotalItems] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [review, setReview] = useState(null)
   const [approveOpen, setApproveOpen] = useState(false)
@@ -28,16 +38,43 @@ export default function ApprovalQueuePage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await marketingContentService.getApprovalQueue())
+      const result = await getApprovalQueue({ page, limit: PAGE_SIZE })
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load approval queue.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
+
+  const openReview = async (row) => {
+    setReview(row)
+    try {
+      const full = await getApprovalItem(row.id)
+      if (full) setReview(full)
+    } catch (err) {
+      showToast(err.message || 'Unable to load approval details.', 'error')
+    }
+  }
+
+  const closeOverlays = () => {
+    setApproveOpen(false)
+    setRejectOpen(false)
+    setChangesOpen(false)
+    setReview(null)
+    setReason('')
+  }
 
   const target = review
 
@@ -46,7 +83,7 @@ export default function ApprovalQueuePage() {
       <Breadcrumbs />
       <PageHeader
         title="Approval Queue"
-        description="Review and approve marketing content before publishing."
+        description="Review sales-script words before they go to the salesperson. Nothing is published from here."
       />
       <Card>
         {loading ? (
@@ -76,7 +113,7 @@ export default function ApprovalQueuePage() {
                 label: 'Actions',
                 render: (row) => (
                   <div className="flex flex-wrap gap-1">
-                    <Button size="sm" onClick={() => setReview(row)}>
+                    <Button size="sm" onClick={() => void openReview(row)}>
                       Review
                     </Button>
                     <Button
@@ -100,7 +137,7 @@ export default function ApprovalQueuePage() {
                     >
                       Reject
                     </Button>
-                    <Link to={`/marketing/content/${row.id}?edit=1`}>
+                    <Link to={`/marketing/content/${row.id}?edit=1&from=approval`}>
                       <Button size="sm" variant="secondary">
                         Edit
                       </Button>
@@ -110,7 +147,11 @@ export default function ApprovalQueuePage() {
               },
             ]}
             rows={rows}
-            pageSize={8}
+            page={page}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+            totalItems={totalItems}
+            showPagination
             emptyTitle="No content awaiting approval."
           />
         )}
@@ -134,11 +175,7 @@ export default function ApprovalQueuePage() {
               <p>Tone: {review.tone}</p>
               <p>Language: {review.language}</p>
               <div className="flex flex-wrap gap-2 pt-2">
-                <Button
-                  onClick={() => setApproveOpen(true)}
-                >
-                  Approve
-                </Button>
+                <Button onClick={() => setApproveOpen(true)}>Approve</Button>
                 <Button variant="secondary" onClick={() => setRejectOpen(true)}>
                   Reject
                 </Button>
@@ -171,11 +208,12 @@ export default function ApprovalQueuePage() {
           if (!target) return
           setBusy(true)
           try {
-            await marketingContentService.approveContent(target.id)
-            setApproveOpen(false)
-            setReview(null)
-            showToast('Content approved successfully.')
+            await approveApprovalItem(target.id)
+            closeOverlays()
+            showToast('Content approved.')
             await load()
+          } catch (err) {
+            showToast(err.message || 'Unable to approve content.', 'error')
           } finally {
             setBusy(false)
           }
@@ -193,11 +231,12 @@ export default function ApprovalQueuePage() {
             if (!target || !reason.trim()) return
             setBusy(true)
             try {
-              await marketingContentService.rejectContent(target.id, reason.trim())
-              setRejectOpen(false)
-              setReview(null)
+              await rejectApprovalItem(target.id, reason.trim())
+              closeOverlays()
               showToast('Content rejected.')
               await load()
+            } catch (err) {
+              showToast(err.message || 'Unable to reject content.', 'error')
             } finally {
               setBusy(false)
             }
@@ -208,7 +247,7 @@ export default function ApprovalQueuePage() {
             className="input-field min-h-24"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Please update the offer details."
+            placeholder="Needs stronger CTA"
             required
           />
           <div className="mt-4 flex justify-end gap-2">
@@ -216,7 +255,7 @@ export default function ApprovalQueuePage() {
               Cancel
             </Button>
             <Button type="submit" disabled={busy || !reason.trim()}>
-              Reject
+              {busy ? <LoadingSpinner size={16} /> : 'Reject'}
             </Button>
           </div>
         </form>
@@ -229,11 +268,12 @@ export default function ApprovalQueuePage() {
             if (!target || !reason.trim()) return
             setBusy(true)
             try {
-              await marketingContentService.requestChanges(target.id, reason.trim())
-              setChangesOpen(false)
-              setReview(null)
-              showToast('Change request saved.')
+              await requestApprovalChanges(target.id, reason.trim())
+              closeOverlays()
+              showToast('Change request sent. Content moved to draft.')
               await load()
+            } catch (err) {
+              showToast(err.message || 'Unable to request changes.', 'error')
             } finally {
               setBusy(false)
             }
@@ -244,6 +284,7 @@ export default function ApprovalQueuePage() {
             className="input-field min-h-24"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            placeholder="Please soften tone"
             required
           />
           <div className="mt-4 flex justify-end gap-2">
@@ -251,7 +292,7 @@ export default function ApprovalQueuePage() {
               Cancel
             </Button>
             <Button type="submit" disabled={busy || !reason.trim()}>
-              Save Request
+              {busy ? <LoadingSpinner size={16} /> : 'Save Request'}
             </Button>
           </div>
         </form>

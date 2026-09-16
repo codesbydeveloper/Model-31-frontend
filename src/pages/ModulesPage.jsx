@@ -8,13 +8,13 @@ export default function ModulesPage() {
     <div className="mx-auto w-full max-w-5xl">
       <PageHeader
         title="Modules"
-        description="Business modules will be configured in later steps."
+        description="Use the sidebar to open Super Admin, Dealership, BDC, Sales, or Marketing."
       />
       <Card padding={false}>
         <EmptyState
           icon={LayoutGrid}
-          title="Modules coming soon"
-          description="Role-based modules for Super Admin, Dealership Admin, BDC, Sales, and Marketing will appear here."
+          title="Choose a module"
+          description="Role workspaces are in the sidebar after you sign in."
         />
       </Card>
     </div>

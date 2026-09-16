@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
@@ -6,67 +6,143 @@ import Toggle from '../../components/common/Toggle'
 import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import ConfirmModal from '../../components/common/ConfirmModal'
+import ErrorState from '../../components/ui/ErrorState'
 import { useToast } from '../../hooks/useToast'
-import systemControlService from '../../services/mock/systemControlService'
-import nuclearModeService from '../../services/mock/nuclearModeService'
+import {
+  getSystemControls,
+  setNuclearMode,
+  setSystemControlToggle,
+  updateSystemControls,
+} from '../../services/api/superAdminSystemControlsService'
 
-const GROUPS = [
-  { key: 'salesperson', title: 'Salesperson Control' },
-  { key: 'dealership', title: 'Dealership Control' },
-  { key: 'social', title: 'Social Posting Control' },
-  { key: 'autonomy', title: 'System Autonomy Control' },
-]
+const TOGGLE_FLUSH_MS = 400
+
+function patchToggle(page, key, enabled) {
+  if (!page) return page
+  return {
+    ...page,
+    groups: page.groups.map((group) => ({
+      ...group,
+      toggles: group.toggles.map((toggle) =>
+        toggle.key === key
+          ? { ...toggle, enabled, status: enabled ? 'ON' : 'OFF' }
+          : toggle,
+      ),
+    })),
+  }
+}
 
 export default function SystemControlsPage() {
   const { showToast } = useToast()
-  const [controls, setControls] = useState(null)
-  const [labels, setLabels] = useState({})
-  const [critical, setCritical] = useState([])
-  const [summary, setSummary] = useState(null)
-  const [nuclear, setNuclear] = useState(null)
+  const [page, setPage] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [savingKey, setSavingKey] = useState(null)
   const [pending, setPending] = useState(null)
   const [nuclearPending, setNuclearPending] = useState(null)
   const [nuclearLoading, setNuclearLoading] = useState(false)
+  const queuedRef = useRef({})
+  const labelsRef = useRef({})
+  const timerRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(false)
     try {
-      const [data, status, nuclearMode] = await Promise.all([
-        systemControlService.getSystemControls(),
-        systemControlService.getControlStatusSummary(),
-        nuclearModeService.getNuclearMode(),
-      ])
-      setControls(data.controls)
-      setLabels(data.labels)
-      setCritical(data.critical)
-      setSummary(status)
-      setNuclear(nuclearMode)
+      setPage(await getSystemControls())
+    } catch (err) {
+      setPage(null)
+      setError(true)
+      showToast(err.message || 'Unable to load system controls.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 0)
-    return () => window.clearTimeout(t)
+    const timer = window.setTimeout(() => void load(), 0)
+    return () => window.clearTimeout(timer)
   }, [load])
 
-  const applyToggle = async (group, key, value) => {
-    await systemControlService.updateSystemControl(group, key, value)
-    showToast(`${labels[key] || key} ${value ? 'enabled' : 'disabled'}.`)
-    await load()
+  useEffect(() => () => window.clearTimeout(timerRef.current), [])
+
+  const flushToggles = useCallback(async () => {
+    const queued = queuedRef.current
+    queuedRef.current = {}
+    const labels = labelsRef.current
+    labelsRef.current = {}
+    const entries = []
+    Object.entries(queued).forEach(([groupId, values]) => {
+      Object.entries(values).forEach(([key, enabled]) => {
+        entries.push({ groupId, key, enabled, label: labels[key] || key })
+      })
+    })
+    if (!entries.length) return
+
+    setSavingKey(entries.length === 1 ? entries[0].key : 'bulk')
+    try {
+      let next
+      if (entries.length === 1) {
+        next = await setSystemControlToggle(entries[0].key, entries[0].enabled)
+        showToast(
+          next.message ||
+            `${entries[0].label} ${entries[0].enabled ? 'enabled' : 'disabled'}.`,
+        )
+      } else {
+        next = await updateSystemControls(queued)
+        showToast(next.message || 'Controls updated.')
+      }
+      setPage(next)
+    } catch (err) {
+      showToast(err.message || 'Unable to update controls.', 'error')
+      try {
+        setPage(await getSystemControls())
+      } catch {
+        // keep optimistic values if reload also fails
+      }
+    } finally {
+      setSavingKey(null)
+      setPending(null)
+    }
+  }, [showToast])
+
+  const queueToggle = (groupId, key, enabled, label) => {
+    setPage((current) => patchToggle(current, key, enabled))
+    queuedRef.current = {
+      ...queuedRef.current,
+      [groupId]: {
+        ...(queuedRef.current[groupId] || {}),
+        [key]: enabled,
+      },
+    }
+    labelsRef.current = { ...labelsRef.current, [key]: label }
+    window.clearTimeout(timerRef.current)
+    timerRef.current = window.setTimeout(() => void flushToggles(), TOGGLE_FLUSH_MS)
   }
 
-  const onToggle = (group, key, next) => {
-    if (!next && critical.includes(key)) {
-      setPending({ group, key, next })
+  const onToggle = (groupId, toggle, next) => {
+    if (!next && toggle.critical) {
+      setPending({ groupId, ...toggle, next })
       return
     }
-    void applyToggle(group, key, next)
+    queueToggle(groupId, toggle.key, next, toggle.label)
   }
 
-  if (loading || !controls || !summary || !nuclear) {
+  const applyNuclear = async (enabled) => {
+    setNuclearLoading(true)
+    try {
+      const next = await setNuclearMode(enabled)
+      setPage(next)
+      showToast(next.message || `Nuclear Mode ${enabled ? 'enabled' : 'disabled'}.`)
+      setNuclearPending(null)
+    } catch (err) {
+      showToast(err.message || 'Unable to update Nuclear Mode.', 'error')
+    } finally {
+      setNuclearLoading(false)
+    }
+  }
+
+  if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <LoadingSpinner size={32} />
@@ -74,31 +150,29 @@ export default function SystemControlsPage() {
     )
   }
 
+  if (error || !page) {
+    return <ErrorState onRetry={load} />
+  }
+
+  const busy = Boolean(savingKey) || nuclearLoading
+  const nuclear = page.nuclearMode
+
   return (
     <div className="mx-auto w-full max-w-5xl">
       <Breadcrumbs />
-      <PageHeader
-        title="System Control Center"
-        description="Control platform automation, AI behavior, dispatch, social publishing and dealership operations."
-      />
+      <PageHeader title={page.pageTitle} description={page.description} />
 
       <Card className="mb-5">
         <h2 className="mb-3 text-base font-semibold">Control Status</h2>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {[
-            ['System Autonomy', summary.systemAutonomy],
-            ['Lead Dispatch', summary.leadDispatch],
-            ['AI Conversation', summary.aiConversation],
-            ['CRM Sync', summary.crmSync],
-            ['Social Publishing', summary.socialPublishing],
-          ].map(([label, status]) => (
+          {page.controlStatus.map((item) => (
             <div
-              key={label}
+              key={item.key}
               className="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-2"
             >
-              <p className="text-xs text-[var(--text-muted)]">{label}</p>
+              <p className="text-xs text-[var(--text-muted)]">{item.label}</p>
               <div className="mt-1">
-                <StatusBadge status={status} />
+                <StatusBadge status={item.status} />
               </div>
             </div>
           ))}
@@ -109,9 +183,7 @@ export default function SystemControlsPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-base font-semibold">Nuclear Mode</h2>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              {nuclear.description}
-            </p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">{nuclear.description}</p>
           </div>
           <StatusBadge status={nuclear.status} />
         </div>
@@ -120,23 +192,25 @@ export default function SystemControlsPage() {
             label="Nuclear Mode"
             description={nuclear.enabled ? 'ON' : 'OFF'}
             checked={nuclear.enabled}
+            disabled={busy}
             onChange={(next) => setNuclearPending(next)}
           />
         </div>
       </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {GROUPS.map((group) => (
-          <Card key={group.key}>
+        {page.groups.map((group) => (
+          <Card key={group.id}>
             <h2 className="mb-4 text-base font-semibold">{group.title}</h2>
             <div className="space-y-4">
-              {Object.entries(controls[group.key]).map(([key, value]) => (
+              {group.toggles.map((toggle) => (
                 <Toggle
-                  key={key}
-                  label={labels[key] || key}
-                  description={value ? 'ON' : 'OFF'}
-                  checked={value}
-                  onChange={(next) => onToggle(group.key, key, next)}
+                  key={toggle.key}
+                  label={toggle.label}
+                  description={toggle.enabled ? 'ON' : 'OFF'}
+                  checked={toggle.enabled}
+                  disabled={busy}
+                  onChange={(next) => onToggle(group.id, toggle, next)}
                 />
               ))}
             </div>
@@ -147,30 +221,21 @@ export default function SystemControlsPage() {
       <ConfirmModal
         open={Boolean(pending)}
         onClose={() => setPending(null)}
-        onConfirm={async () => {
+        onConfirm={() => {
           if (!pending) return
-          await applyToggle(pending.group, pending.key, pending.next)
+          queueToggle(pending.groupId, pending.key, pending.next, pending.label)
           setPending(null)
         }}
-        title={`Disable ${labels[pending?.key] || 'feature'}?`}
+        title={`Disable ${pending?.label || 'feature'}?`}
         message="Disabling this feature may prevent qualified leads from being automatically dispatched or other automation from running."
         confirmLabel="Disable"
         danger
+        loading={savingKey === pending?.key}
       />
       <ConfirmModal
         open={nuclearPending === true}
         onClose={() => setNuclearPending(null)}
-        onConfirm={async () => {
-          setNuclearLoading(true)
-          try {
-            const next = await nuclearModeService.setNuclearMode(true)
-            setNuclear(next)
-            showToast('Nuclear Mode enabled (mock).')
-            setNuclearPending(null)
-          } finally {
-            setNuclearLoading(false)
-          }
-        }}
+        onConfirm={() => void applyNuclear(true)}
         title="Enable Nuclear Mode?"
         message="Nuclear Mode enables advanced deal-assistance features. All actions remain subject to dealership controls and negotiation limits."
         confirmLabel="Enable Nuclear Mode"
@@ -179,17 +244,7 @@ export default function SystemControlsPage() {
       <ConfirmModal
         open={nuclearPending === false}
         onClose={() => setNuclearPending(null)}
-        onConfirm={async () => {
-          setNuclearLoading(true)
-          try {
-            const next = await nuclearModeService.setNuclearMode(false)
-            setNuclear(next)
-            showToast('Nuclear Mode disabled (mock).')
-            setNuclearPending(null)
-          } finally {
-            setNuclearLoading(false)
-          }
-        }}
+        onConfirm={() => void applyNuclear(false)}
         title="Disable Nuclear Mode?"
         message="Advanced deal-assistance features will be disabled."
         confirmLabel="Disable"

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
 import Modal from '../../components/common/Modal'
+import ConfirmModal from '../../components/common/ConfirmModal'
 import Input from '../../components/common/Input'
 import Select from '../../components/common/Select'
 import SearchInput from '../../components/common/SearchInput'
@@ -13,15 +14,20 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import StatusBadge from '../../components/common/StatusBadge'
 import { sortBy } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
-import userService from '../../services/mock/userService'
+import userService from '../../services/api/userService'
+import dealershipService from '../../services/api/dealershipService'
 import { USER_ROLES, USER_STATUSES } from '../../data/platformUsers'
-import { initialDealerships } from '../../data/dealerships'
+
+const PAGE_SIZE = 10
+const SEARCH_DEBOUNCE_MS = 400
+const UNASSIGNED = { value: 'Unassigned', label: 'Unassigned' }
 
 const EMPTY = {
   name: '',
   email: '',
+  password: '',
   role: 'Salesperson',
-  dealership: 'Miami Luxury Motors',
+  dealership: 'Unassigned',
   phone: '',
   status: 'Active',
 }
@@ -31,34 +37,76 @@ export default function UsersPage() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
   const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY)
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [dealershipOptions, setDealershipOptions] = useState([UNASSIGNED])
 
-  const dealershipOptions = useMemo(
-    () => [
-      'AutoFlow Corporate',
-      ...initialDealerships.map((d) => d.name),
-      'Unassigned',
-    ],
-    [],
-  )
+  const loadDealershipOptions = useCallback(async () => {
+    try {
+      const options = await dealershipService.getDealershipOptions()
+      const real = options.filter(
+        (option) =>
+          option.value &&
+          option.value !== UNASSIGNED.value &&
+          option.label !== UNASSIGNED.label,
+      )
+      setDealershipOptions([UNASSIGNED, ...real])
+    } catch (err) {
+      setDealershipOptions([UNASSIGNED])
+      showToast(err.message || 'Unable to load dealerships.', 'error')
+    }
+  }, [showToast])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await userService.getUsers())
+      const result = await userService.getUsers({
+        page,
+        limit: PAGE_SIZE,
+        search: debouncedSearch,
+        role: roleFilter,
+        status: statusFilter,
+      })
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load users.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, debouncedSearch, roleFilter, statusFilter, showToast])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadDealershipOptions()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadDealershipOptions])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -67,21 +115,22 @@ export default function UsersPage() {
     return () => window.clearTimeout(timer)
   }, [load])
 
-  const filtered = useMemo(() => {
-    let list = rows
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.email.toLowerCase().includes(q) ||
-          r.dealership.toLowerCase().includes(q),
-      )
+  const filtered = useMemo(
+    () => sortBy(rows, sortKey, sortDir),
+    [rows, sortKey, sortDir],
+  )
+
+  const matchDealershipValue = (row) => {
+    if (row?.dealershipId) {
+      const byId = dealershipOptions.find((option) => option.value === row.dealershipId)
+      if (byId) return byId.value
     }
-    if (roleFilter !== 'all') list = list.filter((r) => r.role === roleFilter)
-    if (statusFilter !== 'all') list = list.filter((r) => r.status === statusFilter)
-    return sortBy(list, sortKey, sortDir)
-  }, [rows, search, roleFilter, statusFilter, sortKey, sortDir])
+    if (!row?.dealership) return UNASSIGNED.value
+    const match = dealershipOptions.find(
+      (option) => option.value === row.dealership || option.label === row.dealership,
+    )
+    return match?.value || UNASSIGNED.value
+  }
 
   const openCreate = () => {
     setEditing(null)
@@ -95,8 +144,9 @@ export default function UsersPage() {
     setForm({
       name: row.name,
       email: row.email,
+      password: '',
       role: row.role,
-      dealership: row.dealership,
+      dealership: matchDealershipValue(row),
       phone: row.phone,
       status: row.status,
     })
@@ -109,6 +159,7 @@ export default function UsersPage() {
     const next = {}
     if (!form.name.trim()) next.name = 'Name is required.'
     if (!form.email.trim()) next.email = 'Email is required.'
+    if (!editing && !form.password.trim()) next.password = 'Password is required.'
     setErrors(next)
     if (Object.keys(next).length) return
 
@@ -122,9 +173,30 @@ export default function UsersPage() {
         showToast('User added successfully.')
       }
       setModalOpen(false)
-      await load()
+      if (editing || page === 1) {
+        await load()
+      } else {
+        setPage(1)
+      }
+    } catch (err) {
+      showToast(err.message || 'Unable to save user.', 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleting?.id) return
+    setDeleteLoading(true)
+    try {
+      await userService.deleteUser(deleting.id)
+      showToast('User deleted successfully.')
+      setDeleting(null)
+      await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to delete user.', 'error')
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -145,10 +217,16 @@ export default function UsersPage() {
       key: 'actions',
       label: 'Actions',
       render: (row) => (
-        <Button variant="ghost" size="sm" onClick={() => openEdit(row)}>
-          <Pencil size={14} />
-          Edit
-        </Button>
+        <div className="flex flex-wrap gap-1">
+          <Button variant="ghost" size="sm" onClick={() => openEdit(row)}>
+            <Pencil size={14} />
+            Edit
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setDeleting(row)}>
+            <Trash2 size={14} />
+            Delete
+          </Button>
+        </div>
       ),
     },
   ]
@@ -171,10 +249,7 @@ export default function UsersPage() {
         <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
           <SearchInput
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search users"
           />
           <Select
@@ -219,7 +294,10 @@ export default function UsersPage() {
               }
             }}
             page={page}
+            pageSize={PAGE_SIZE}
             onPageChange={setPage}
+            totalItems={totalItems}
+            showPagination
             emptyTitle="No users found."
             emptyActionLabel="Add User"
             onEmptyAction={openCreate}
@@ -247,6 +325,16 @@ export default function UsersPage() {
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             error={errors.email}
+            containerClassName="sm:col-span-2"
+          />
+          <Input
+            label="Password"
+            type="password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            error={errors.password}
+            placeholder={editing ? 'Leave blank to keep current password' : ''}
+            autoComplete={editing ? 'new-password' : 'new-password'}
             containerClassName="sm:col-span-2"
           />
           <Select
@@ -291,6 +379,17 @@ export default function UsersPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        open={Boolean(deleting)}
+        onClose={() => !deleteLoading && setDeleting(null)}
+        onConfirm={confirmDelete}
+        title="Delete user"
+        message={`Are you sure you want to delete ${deleting?.name}?`}
+        confirmLabel="Delete"
+        danger
+        loading={deleteLoading}
+      />
     </div>
   )
 }

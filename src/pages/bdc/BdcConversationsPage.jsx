@@ -7,13 +7,16 @@ import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
 import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
-import conversationService from '../../services/mock/conversationService'
-import bdcService from '../../services/mock/bdcService'
+import { useToast } from '../../hooks/useToast'
+import bdcConversationService from '../../services/api/bdcConversationService'
+import bdcLeadService from '../../services/api/bdcLeadService'
 
 export default function BdcConversationsPage() {
+  const { showToast } = useToast()
   const [params] = useSearchParams()
   const [leads, setLeads] = useState([])
   const [selectedId, setSelectedId] = useState(params.get('lead') || '')
+  const [selected, setSelected] = useState(null)
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [draft, setDraft] = useState('')
@@ -22,14 +25,38 @@ export default function BdcConversationsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const rows = await bdcService.getBdcLeads()
+      const rows = await bdcConversationService.getBdcConversations()
       setLeads(rows)
-      const first = params.get('lead') || rows[0]?.id
-      setSelectedId(first)
+      setSelectedId((current) => current || params.get('lead') || rows[0]?.id || '')
+    } catch (err) {
+      setLeads([])
+      showToast(err.message || 'Unable to load conversations.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [params])
+  }, [params, showToast])
+
+  const loadThread = useCallback(
+    async (leadId) => {
+      if (!leadId) {
+        setMessages([])
+        setSelected(null)
+        return
+      }
+      try {
+        const [msgs, detail] = await Promise.all([
+          bdcConversationService.getBdcConversation(leadId),
+          bdcLeadService.getBdcLead(leadId).catch(() => null),
+        ])
+        setMessages(msgs)
+        setSelected(detail)
+      } catch (err) {
+        setMessages([])
+        showToast(err.message || 'Unable to load messages.', 'error')
+      }
+    },
+    [showToast],
+  )
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -38,20 +65,13 @@ export default function BdcConversationsPage() {
 
   useEffect(() => {
     if (!selectedId) return undefined
-    let active = true
-    const t = window.setTimeout(async () => {
-      const msgs = await conversationService.getConversation(selectedId)
-      if (active) setMessages(msgs)
-    }, 0)
-    return () => {
-      active = false
-      window.clearTimeout(t)
-    }
-  }, [selectedId])
+    const t = window.setTimeout(() => void loadThread(selectedId), 0)
+    return () => window.clearTimeout(t)
+  }, [selectedId, loadThread])
 
-  const selected = useMemo(
-    () => leads.find((item) => item.id === selectedId) || null,
-    [leads, selectedId],
+  const selectedSummary = useMemo(
+    () => selected || leads.find((item) => item.id === selectedId) || null,
+    [selected, leads, selectedId],
   )
 
   const send = async (e) => {
@@ -59,13 +79,14 @@ export default function BdcConversationsPage() {
     if (!draft.trim() || !selectedId) return
     setSending(true)
     try {
-      const msg = await conversationService.sendMessage(
-        selectedId,
-        draft.trim(),
-        'agent',
-      )
-      setMessages((prev) => [...prev, msg])
+      await bdcConversationService.sendBdcMessage(selectedId, {
+        senderType: 'STAFF',
+        message: draft.trim(),
+      })
       setDraft('')
+      await loadThread(selectedId)
+    } catch (err) {
+      showToast(err.message || 'Unable to send message.', 'error')
     } finally {
       setSending(false)
     }
@@ -114,12 +135,13 @@ export default function BdcConversationsPage() {
         <Card className="flex min-h-[560px] flex-col xl:col-span-6" padding={false}>
           <div className="border-b border-[var(--border-default)] px-4 py-3">
             <h2 className="text-base font-semibold">
-              {selected?.customerName || 'Select a conversation'}
+              {selectedSummary?.customerName || 'Select a conversation'}
             </h2>
           </div>
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {messages.map((message) => {
-              const isCustomer = message.sender === 'customer'
+              const sender = String(message.sender || '').toLowerCase()
+              const isCustomer = sender.includes('customer')
               return (
                 <div
                   key={message.id}
@@ -137,11 +159,11 @@ export default function BdcConversationsPage() {
                       <span>
                         {isCustomer
                           ? 'Customer'
-                          : message.sender === 'ai'
+                          : sender.includes('ai')
                             ? 'AI'
-                            : 'Agent'}
+                            : 'Staff'}
                       </span>
-                      <span>· {message.timestamp}</span>
+                      {message.timestamp ? <span>· {message.timestamp}</span> : null}
                     </div>
                     <p className="text-sm">{message.text}</p>
                   </div>
@@ -164,17 +186,17 @@ export default function BdcConversationsPage() {
 
         <Card className="xl:col-span-3">
           <h2 className="text-base font-semibold">Lead details</h2>
-          {selected ? (
+          {selectedSummary ? (
             <dl className="mt-3 space-y-2 text-sm">
-              <Row label="Customer" value={selected.customerName} />
-              <Row label="Vehicle" value={selected.vehicle} />
-              <Row label="Score" value={selected.score} />
-              <Row label="Tier" value={selected.tier} />
+              <Row label="Customer" value={selectedSummary.customerName} />
+              <Row label="Vehicle" value={selectedSummary.vehicle} />
+              <Row label="Score" value={selectedSummary.score} />
+              <Row label="Tier" value={selectedSummary.tier} />
               <Row
                 label="Status"
-                value={<StatusBadge status={selected.bdcStatus || selected.status} />}
+                value={<StatusBadge status={selectedSummary.bdcStatus || selectedSummary.status} />}
               />
-              <Row label="Salesperson" value={selected.salesperson || 'Unassigned'} />
+              <Row label="Salesperson" value={selectedSummary.salesperson || 'Unassigned'} />
               <Row label="Conversation" value="Active" />
             </dl>
           ) : (

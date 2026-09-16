@@ -7,7 +7,7 @@ import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import Select from '../../components/common/Select'
 import { useToast } from '../../hooks/useToast'
-import notificationService from '../../services/mock/notificationService'
+import notificationService from '../../services/api/notificationService'
 import { Link } from 'react-router-dom'
 
 export default function PlatformNotificationsPage() {
@@ -20,10 +20,13 @@ export default function PlatformNotificationsPage() {
     setLoading(true)
     try {
       setRows(await notificationService.getNotifications())
+    } catch (err) {
+      setRows([])
+      showToast(err.message || 'Unable to load notifications.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -52,9 +55,13 @@ export default function PlatformNotificationsPage() {
           <Button
             variant="secondary"
             onClick={async () => {
-              await notificationService.markAllNotificationsRead()
-              showToast('All notifications marked as read.')
-              await load()
+              try {
+                await notificationService.markAllNotificationsRead()
+                showToast('All notifications marked as read.')
+                await load()
+              } catch (err) {
+                showToast(err.message || 'Unable to mark notifications as read.', 'error')
+              }
             }}
           >
             Mark All Read

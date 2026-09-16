@@ -36,7 +36,8 @@ import StatCard from '../../../components/common/StatCard'
 import LoadingSpinner from '../../../components/common/LoadingSpinner'
 import FunnelVisual from '../../../components/common/FunnelVisual'
 import { formatNumber } from '../../../utils/table'
-import acquisitionService from '../../../services/mock/acquisitionService'
+import { useToast } from '../../../hooks/useToast'
+import { getAcquisitionDashboard } from '../../../services/api/marketingDashboardService'
 
 const KPI_META = [
   { key: 'engagedPeople', label: 'Engaged People', icon: Users },
@@ -70,17 +71,21 @@ function ChartCard({ title, children }) {
 }
 
 export default function AcquisitionDashboard() {
+  const { showToast } = useToast()
   const [overview, setOverview] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setOverview(await acquisitionService.getAcquisitionOverview())
+      setOverview(await getAcquisitionDashboard())
+    } catch (err) {
+      setOverview(null)
+      showToast(err.message || 'Unable to load acquisition dashboard.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -162,7 +167,8 @@ export default function AcquisitionDashboard() {
             value={formatNumber(kpis.dealershipLeads)}
           />
           <p className="mt-3 text-sm text-[var(--text-secondary)]">
-            Dealership pipeline totals are shown separately and are not combined with Model 31 acquisition.
+            {overview.dealershipNote ||
+              'Dealership pipeline totals are shown separately and are not combined with Model 31 acquisition.'}
           </p>
         </Card>
       </div>

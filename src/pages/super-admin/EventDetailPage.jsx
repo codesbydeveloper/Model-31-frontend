@@ -8,10 +8,12 @@ import Button from '../../components/common/Button'
 import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import ErrorState from '../../components/ui/ErrorState'
-import eventService from '../../services/mock/eventService'
+import { useToast } from '../../hooks/useToast'
+import { getEventById } from '../../services/api/superAdminEventService'
 
 export default function EventDetailPage() {
   const { id } = useParams()
+  const { showToast } = useToast()
   const [item, setItem] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -20,13 +22,15 @@ export default function EventDetailPage() {
     setLoading(true)
     setError(false)
     try {
-      setItem(await eventService.getEventById(id))
-    } catch {
-      setError(true)
+      setItem(await getEventById(id))
+    } catch (err) {
+      setItem(null)
+      setError(err.status !== 404)
+      showToast(err.message || 'Unable to load event.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -79,7 +83,7 @@ export default function EventDetailPage() {
           <Row label="Timestamp" value={item.created} />
           <Row label="Source" value={item.source} />
           <Row label="Entity" value={item.entity} />
-          <Row label="Payload Summary" value={item.payloadSummary} />
+          <Row label="Payload Summary" value={item.payloadSummary || '—'} />
           <Row label="Processing Status" value={item.status} />
           <Row
             label="Duration"
@@ -87,6 +91,11 @@ export default function EventDetailPage() {
           />
           <Row label="Processed" value={item.processed || '—'} />
         </dl>
+        {item.payload ? (
+          <pre className="mt-4 overflow-x-auto rounded-[var(--radius-md)] bg-[var(--bg-muted)] p-3 text-xs">
+            {JSON.stringify(item.payload, null, 2)}
+          </pre>
+        ) : null}
       </Card>
     </div>
   )

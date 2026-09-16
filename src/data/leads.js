@@ -43,7 +43,7 @@ export const leadStatsOverview = {
   closed: 384,
 }
 
-function breakdownFromScore(score) {
+export function breakdownFromScore(score) {
   const base = Math.floor(score / 5)
   const rem = score - base * 5
   const parts = [base, base, base, base, base]
@@ -661,8 +661,9 @@ const seed = [
   },
 ]
 
-function defaultTimeline(lead) {
-  const base = new Date(lead.createdAt)
+export function defaultTimeline(lead) {
+  const parsed = new Date(lead.createdAt)
+  const base = Number.isNaN(parsed.getTime()) ? new Date() : parsed
   const add = (mins, label, description) => {
     const t = new Date(base.getTime() + mins * 60000)
     return {
@@ -678,7 +679,7 @@ function defaultTimeline(lead) {
   }
 
   const items = [
-    add(0, 'Lead Created', 'Lead entered AutoFlow'),
+    add(0, 'Lead Created', 'Lead entered Model 31'),
     add(
       0,
       'Lead Classified',
@@ -708,7 +709,7 @@ function defaultTimeline(lead) {
   return items
 }
 
-function defaultActivity(lead) {
+export function defaultActivity(lead) {
   return [
     {
       id: `${lead.id}-act-1`,

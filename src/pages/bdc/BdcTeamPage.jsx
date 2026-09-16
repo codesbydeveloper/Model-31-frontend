@@ -8,22 +8,27 @@ import LoadingSpinner from '../../components/common/LoadingSpinner'
 import DataTable from '../../components/common/DataTable'
 import Select from '../../components/common/Select'
 import { formatNumber, sortBy } from '../../utils/table'
-import bdcService from '../../services/mock/bdcService'
+import { useToast } from '../../hooks/useToast'
+import bdcTeamService from '../../services/api/bdcTeamService'
 
 export default function BdcTeamPage() {
+  const { showToast } = useToast()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
-  const [sortKey, setSortKey] = useState('accepted')
-  const [sortDir, setSortDir] = useState('desc')
+  const [sortKey, setSortKey] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await bdcService.getSalespeopleAvailability())
+      setRows(await bdcTeamService.getBdcTeam({ sort: sortKey }))
+    } catch (err) {
+      setRows([])
+      showToast(err.message || 'Unable to load team performance.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [sortKey, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -40,7 +45,7 @@ export default function BdcTeamPage() {
       assigned: rows.reduce((sum, r) => sum + r.assigned, 0),
       accepted: rows.reduce((sum, r) => sum + r.accepted, 0),
       sold: rows.reduce((sum, r) => sum + r.sold, 0),
-      online: rows.filter((r) => r.status === 'ONLINE').length,
+      online: rows.filter((r) => String(r.status).toUpperCase() === 'ONLINE').length,
     }),
     [rows],
   )
@@ -60,10 +65,10 @@ export default function BdcTeamPage() {
               setSortDir(dir)
             }}
             options={[
+              { value: 'name:asc', label: 'Name A → Z' },
               { value: 'accepted:desc', label: 'Accepted high → low' },
               { value: 'assigned:desc', label: 'Assigned high → low' },
               { value: 'sold:desc', label: 'Sold high → low' },
-              { value: 'name:asc', label: 'Name A → Z' },
             ]}
             className="w-48"
           />

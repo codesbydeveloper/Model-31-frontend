@@ -5,9 +5,9 @@ export default function SettingsPlaceholder() {
     <PlaceholderPage
       title="Settings"
       subtitle="Application Settings"
-      description="Configure your AutoFlow preferences."
+      description="Configure your Model 31 preferences."
       showActionPlaceholders={false}
-      nextStepNote="Settings will be implemented in the next steps."
+      nextStepNote="Choose a setting from the sidebar, or return to your dashboard."
     />
   )
 }

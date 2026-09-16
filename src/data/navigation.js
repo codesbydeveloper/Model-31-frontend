@@ -1,6 +1,6 @@
 import { Home, LayoutGrid, Settings } from 'lucide-react'
 
-export const APP_NAME = 'AutoFlow'
+export const APP_NAME = 'Model 31'
 export const APP_SUBTITLE = 'AI Automotive BDC & Lead Dispatch Platform'
 
 /** Step 1 foundation nav — retained for legacy foundation pages. */

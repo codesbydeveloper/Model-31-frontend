@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import PageHeader from '../../../components/layout/PageHeader'
@@ -18,7 +18,15 @@ import {
   FOLLOW_UP_STATUSES,
   FOLLOW_UP_TRIGGERS,
 } from '../../../data/followUpSequences'
-import followUpService from '../../../services/mock/followUpService'
+import {
+  getFollowUps,
+  createFollowUp,
+  pauseFollowUp,
+  resumeFollowUp,
+} from '../../../services/api/marketingFollowUpService'
+
+const PAGE_SIZE = 8
+const SEARCH_DEBOUNCE_MS = 400
 
 const EMPTY_FORM = {
   name: '',
@@ -32,8 +40,10 @@ export default function FollowUpsPage() {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [rows, setRows] = useState([])
+  const [totalItems, setTotalItems] = useState(0)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
   const [createOpen, setCreateOpen] = useState(false)
@@ -44,42 +54,53 @@ export default function FollowUpsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await followUpService.getFollowUpSequences())
+      const result = await getFollowUps({
+        page,
+        limit: PAGE_SIZE,
+        search: debouncedSearch,
+        status,
+      })
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load follow-up sequences.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, debouncedSearch, status, showToast])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
 
-  const filtered = useMemo(() => {
-    let list = rows
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          (r.targetAudience || r.audience || '').toLowerCase().includes(q) ||
-          r.trigger.toLowerCase().includes(q),
-      )
-    }
-    if (status !== 'all') list = list.filter((r) => r.status === status)
-    return list
-  }, [rows, search, status])
-
   const onCreate = async (e) => {
     e.preventDefault()
     setSaving(true)
     try {
-      const created = await followUpService.createFollowUpSequence(form)
+      const created = await createFollowUp(form)
       setCreateOpen(false)
       setForm(EMPTY_FORM)
       showToast('Follow-up sequence created.')
       await load()
-      navigate(`/marketing/acquisition/follow-ups/${created.id}`)
+      if (created?.id) {
+        navigate(`/marketing/acquisition/follow-ups/${created.id}`)
+      }
+    } catch (err) {
+      showToast(err.message || 'Unable to create sequence.', 'error')
     } finally {
       setSaving(false)
     }
@@ -89,13 +110,15 @@ export default function FollowUpsPage() {
     setTogglingId(row.id)
     try {
       if (row.status === 'PAUSED') {
-        await followUpService.resumeFollowUpSequence(row.id)
+        await resumeFollowUp(row.id)
         showToast('Sequence resumed.')
       } else {
-        await followUpService.pauseFollowUpSequence(row.id)
+        await pauseFollowUp(row.id)
         showToast('Sequence paused.')
       }
       await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to update sequence.', 'error')
     } finally {
       setTogglingId(null)
     }
@@ -129,7 +152,10 @@ export default function FollowUpsPage() {
           />
           <Select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => {
+              setStatus(e.target.value)
+              setPage(1)
+            }}
             options={[
               { value: 'all', label: 'All statuses' },
               ...FOLLOW_UP_STATUSES.map((s) => ({ value: s, label: s })),
@@ -165,7 +191,7 @@ export default function FollowUpsPage() {
               {
                 key: 'steps',
                 label: 'Steps',
-                render: (row) => formatNumber((row.steps || []).length),
+                render: (row) => formatNumber(row.stepCount),
               },
               {
                 key: 'activeLeads',
@@ -216,10 +242,12 @@ export default function FollowUpsPage() {
                 ),
               },
             ]}
-            rows={filtered}
+            rows={rows}
             page={page}
-            pageSize={8}
+            pageSize={PAGE_SIZE}
             onPageChange={setPage}
+            totalItems={totalItems}
+            showPagination
             emptyTitle="No follow-up sequences found."
           />
         )}

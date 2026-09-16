@@ -13,14 +13,29 @@ import LoadingSpinner from '../../../components/common/LoadingSpinner'
 import { useToast } from '../../../hooks/useToast'
 import { formatNumber } from '../../../utils/table'
 import { REFERRAL_STATUSES } from '../../../data/referrals'
-import referralService from '../../../services/mock/referralService'
+import {
+  getEligibleReferrals,
+  getReferrals,
+  askForReferral,
+} from '../../../services/api/marketingReferralService'
 
 const DEFAULT_MESSAGE = 'Do you know someone who may be looking for a vehicle?'
+const PAGE_SIZE = 8
 
 export default function ReferralsPage() {
   const { showToast } = useToast()
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({
+    referralRequests: 0,
+    referralLeads: 0,
+    qualifiedReferrals: 0,
+    appointments: 0,
+    soldReferrals: 0,
+  })
+  const [eligible, setEligible] = useState([])
+  const [rows, setRows] = useState([])
+  const [totalItems, setTotalItems] = useState(0)
+  const [eligibleLoading, setEligibleLoading] = useState(true)
+  const [trackingLoading, setTrackingLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
@@ -29,23 +44,49 @@ export default function ReferralsPage() {
   const [message, setMessage] = useState(DEFAULT_MESSAGE)
   const [saving, setSaving] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const loadEligible = useCallback(async () => {
+    setEligibleLoading(true)
     try {
-      setData(await referralService.getReferrals())
+      setEligible(await getEligibleReferrals())
+    } catch (err) {
+      setEligible([])
+      showToast(err.message || 'Unable to load eligible customers.', 'error')
     } finally {
-      setLoading(false)
+      setEligibleLoading(false)
     }
-  }, [])
+  }, [showToast])
+
+  const loadTracking = useCallback(async () => {
+    setTrackingLoading(true)
+    try {
+      const result = await getReferrals({ page, limit: PAGE_SIZE })
+      setStats(result.stats)
+      setRows(result.items)
+      setTotalItems(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setRows([])
+      setTotalItems(0)
+      showToast(err.message || 'Unable to load referrals.', 'error')
+    } finally {
+      setTrackingLoading(false)
+    }
+  }, [page, showToast])
 
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 0)
+    const t = window.setTimeout(() => void loadEligible(), 0)
     return () => window.clearTimeout(t)
-  }, [load])
+  }, [loadEligible])
+
+  useEffect(() => {
+    const t = window.setTimeout(() => void loadTracking(), 0)
+    return () => window.clearTimeout(t)
+  }, [loadTracking])
 
   const filtered = useMemo(() => {
-    if (!data) return []
-    let list = data.rows
+    let list = rows
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(
@@ -57,7 +98,7 @@ export default function ReferralsPage() {
     }
     if (status !== 'all') list = list.filter((r) => r.status === status)
     return list
-  }, [data, search, status])
+  }, [rows, search, status])
 
   const openAsk = (customer) => {
     setSelected(customer)
@@ -70,27 +111,19 @@ export default function ReferralsPage() {
     if (!selected) return
     setSaving(true)
     try {
-      await referralService.createReferralRequest({
-        customerName: selected.customerName,
+      await askForReferral({
+        eligibleId: selected.id,
         message,
       })
       setModalOpen(false)
       showToast('Referral request created.')
-      await load()
+      await Promise.all([loadEligible(), loadTracking()])
+    } catch (err) {
+      showToast(err.message || 'Unable to send referral request.', 'error')
     } finally {
       setSaving(false)
     }
   }
-
-  if (loading || !data) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <LoadingSpinner size={32} />
-      </div>
-    )
-  }
-
-  const { stats, eligible } = data
 
   return (
     <div className="mx-auto w-full max-w-7xl">
@@ -110,28 +143,34 @@ export default function ReferralsPage() {
 
       <Card className="mt-5">
         <h2 className="mb-3 text-base font-semibold">Eligible Customers</h2>
-        <DataTable
-          columns={[
-            { key: 'customerName', label: 'Customer' },
-            {
-              key: 'status',
-              label: 'Status',
-              render: (row) => <StatusBadge status={row.status} />,
-            },
-            {
-              key: 'actions',
-              label: 'Actions',
-              render: (row) => (
-                <Button size="sm" onClick={() => openAsk(row)}>
-                  Ask for Referral
-                </Button>
-              ),
-            },
-          ]}
-          rows={eligible}
-          pageSize={5}
-          emptyTitle="No eligible customers."
-        />
+        {eligibleLoading ? (
+          <div className="flex justify-center py-16">
+            <LoadingSpinner size={28} />
+          </div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'customerName', label: 'Customer' },
+              {
+                key: 'status',
+                label: 'Status',
+                render: (row) => <StatusBadge status={row.status} />,
+              },
+              {
+                key: 'actions',
+                label: 'Actions',
+                render: (row) => (
+                  <Button size="sm" onClick={() => openAsk(row)}>
+                    Ask for Referral
+                  </Button>
+                ),
+              },
+            ]}
+            rows={eligible}
+            pageSize={5}
+            emptyTitle="No eligible customers."
+          />
+        )}
       </Card>
 
       <Card className="mt-5">
@@ -152,32 +191,40 @@ export default function ReferralsPage() {
         </div>
 
         <h2 className="mb-3 text-base font-semibold">Referral Tracking</h2>
-        <DataTable
-          columns={[
-            { key: 'referrer', label: 'Referrer' },
-            { key: 'referredPerson', label: 'Referred Person' },
-            { key: 'source', label: 'Source' },
-            { key: 'date', label: 'Date' },
-            {
-              key: 'status',
-              label: 'Status',
-              render: (row) => <StatusBadge status={row.status} />,
-            },
-            { key: 'lead', label: 'Lead' },
-            { key: 'appointment', label: 'Appointment' },
-            { key: 'sale', label: 'Sale' },
-          ]}
-          rows={filtered}
-          page={page}
-          pageSize={8}
-          onPageChange={setPage}
-          emptyTitle="No referrals found."
-        />
+        {trackingLoading ? (
+          <div className="flex justify-center py-16">
+            <LoadingSpinner size={28} />
+          </div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'referrer', label: 'Referrer' },
+              { key: 'referredPerson', label: 'Referred Person' },
+              { key: 'source', label: 'Source' },
+              { key: 'date', label: 'Date' },
+              {
+                key: 'status',
+                label: 'Status',
+                render: (row) => <StatusBadge status={row.status} />,
+              },
+              { key: 'lead', label: 'Lead' },
+              { key: 'appointment', label: 'Appointment' },
+              { key: 'sale', label: 'Sale' },
+            ]}
+            rows={filtered}
+            page={page}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+            totalItems={totalItems}
+            showPagination
+            emptyTitle="No referrals found."
+          />
+        )}
       </Card>
 
       <Modal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => !saving && setModalOpen(false)}
         title="Ask for Referral"
         className="max-w-lg"
       >
@@ -198,7 +245,12 @@ export default function ReferralsPage() {
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setModalOpen(false)}
+              disabled={saving}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>

@@ -11,7 +11,11 @@ import LoadingSpinner from '../../../components/common/LoadingSpinner'
 import DataTable from '../../../components/common/DataTable'
 import { useToast } from '../../../hooks/useToast'
 import { formatNumber, formatPercent } from '../../../utils/table'
-import followUpService from '../../../services/mock/followUpService'
+import {
+  getFollowUp,
+  pauseFollowUp,
+  resumeFollowUp,
+} from '../../../services/api/marketingFollowUpService'
 
 export default function FollowUpDetailPage() {
   const { id } = useParams()
@@ -23,11 +27,14 @@ export default function FollowUpDetailPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setSequence(await followUpService.getFollowUpSequenceById(id))
+      setSequence(await getFollowUp(id))
+    } catch (err) {
+      setSequence(null)
+      showToast(err.message || 'Unable to load follow-up sequence.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -39,13 +46,15 @@ export default function FollowUpDetailPage() {
     setToggling(true)
     try {
       if (sequence.status === 'PAUSED') {
-        await followUpService.resumeFollowUpSequence(sequence.id)
+        await resumeFollowUp(sequence.id)
         showToast('Sequence resumed.')
       } else {
-        await followUpService.pauseFollowUpSequence(sequence.id)
+        await pauseFollowUp(sequence.id)
         showToast('Sequence paused.')
       }
       await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to update sequence.', 'error')
     } finally {
       setToggling(false)
     }
@@ -108,7 +117,7 @@ export default function FollowUpDetailPage() {
         <StatCard label="Active Leads" value={formatNumber(sequence.activeLeads)} />
         <StatCard label="Completed" value={formatNumber(sequence.completed)} />
         <StatCard label="Conversion" value={formatPercent(sequence.conversion)} />
-        <StatCard label="Steps" value={formatNumber(steps.length)} />
+        <StatCard label="Steps" value={formatNumber(sequence.stepCount || steps.length)} />
       </div>
 
       <Card className="mt-5">

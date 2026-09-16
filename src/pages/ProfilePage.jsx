@@ -9,7 +9,8 @@ import PageHeader from '../components/layout/PageHeader'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { ROLES } from '../data/roles'
-import salespersonService from '../services/mock/salespersonService'
+import { getProfile } from '../services/api/profileService'
+import { updateSalespersonPresence } from '../services/api/salespersonPortalService'
 
 export default function ProfilePage() {
   const { user } = useAuth()
@@ -21,9 +22,15 @@ export default function ProfilePage() {
 
   const loadStatus = useCallback(async () => {
     if (!isSalesperson) return
-    const person = await salespersonService.getCurrentSalesperson()
-    setOnlineStatus(person.status)
-  }, [isSalesperson])
+    try {
+      const profile = await getProfile()
+      const presence = String(profile?.presence || '').toUpperCase()
+      setOnlineStatus(presence === 'ONLINE' || presence === 'OFFLINE' ? presence : 'OFFLINE')
+    } catch (err) {
+      setOnlineStatus('OFFLINE')
+      showToast(err.message || 'Unable to load profile.', 'error')
+    }
+  }, [isSalesperson, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void loadStatus(), 0)
@@ -34,16 +41,15 @@ export default function ProfilePage() {
     setUpdating(true)
     try {
       const next = onlineStatus === 'ONLINE' ? 'OFFLINE' : 'ONLINE'
-      const updated = await salespersonService.updateSalespersonStatus(
-        'sp_001',
-        next,
-      )
+      const updated = await updateSalespersonPresence(next)
       setOnlineStatus(updated.status)
       showToast(
         next === 'ONLINE'
           ? 'You are available for new leads.'
           : 'You are currently offline.',
       )
+    } catch (err) {
+      showToast(err.message || 'Unable to update presence.', 'error')
     } finally {
       setUpdating(false)
     }
@@ -54,7 +60,7 @@ export default function ProfilePage() {
       <Breadcrumbs />
       <PageHeader
         title="Profile"
-        description="Your account details for this AutoFlow demo session."
+        description="Your account details."
       />
       <Card>
         <div className="flex items-center gap-4">
