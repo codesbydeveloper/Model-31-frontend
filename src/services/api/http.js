@@ -36,7 +36,7 @@ export async function apiRequest(path, { method = 'GET', body } = {}) {
     })
   } catch {
     throw new ApiError(
-      'Cannot reach the server. Make sure the API is running on http://localhost:5000.',
+      `Cannot reach the server. Make sure the API is running at ${API_BASE_URL}.`,
     )
   }
 
