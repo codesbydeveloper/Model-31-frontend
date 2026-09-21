@@ -8,6 +8,7 @@ import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import Select from '../../components/common/Select'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
+import StatusBadge from '../../components/common/StatusBadge'
 import ContentPreview from '../../components/marketing/ContentPreview'
 import { useToast } from '../../hooks/useToast'
 import {
@@ -64,6 +65,7 @@ export default function CreateContentPage() {
   const [audiences, setAudiences] = useState(AUDIENCES)
   const [salespeople, setSalespeople] = useState([])
   const [contentId, setContentId] = useState(null)
+  const [generatedItem, setGeneratedItem] = useState(null)
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [generated, setGenerated] = useState(false)
@@ -143,6 +145,7 @@ export default function CreateContentPage() {
   const applyGenerated = (item) => {
     if (!item) return
     setContentId(item.id)
+    setGeneratedItem(item)
     setForm((prev) => ({
       ...prev,
       title: item.caption || item.title,
@@ -156,6 +159,8 @@ export default function CreateContentPage() {
       platform: item.platform || prev.platform,
       tone: item.tone || prev.tone,
       language: item.language || prev.language,
+      audience: item.audience || prev.audience,
+      vehicle: item.vehicle || prev.vehicle,
     }))
     setGenerated(true)
   }
@@ -351,13 +356,17 @@ export default function CreateContentPage() {
             platform={form.platform}
             title={form.caption || form.title}
             body={form.body}
+            cta={form.cta}
             hashtags={hashtagList}
             hideMedia
           />
 
           {generated && (
             <Card>
-              <h2 className="mb-3 text-base font-semibold">Generated Script</h2>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h2 className="text-base font-semibold">Generated Script</h2>
+                <StatusBadge status={generatedItem?.status || 'DRAFT'} />
+              </div>
               <div className="grid gap-3">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">Script</label>
@@ -390,6 +399,16 @@ export default function CreateContentPage() {
                     <span className="text-[var(--text-muted)]">Tone</span>
                     <br />
                     {form.tone}
+                  </p>
+                  <p>
+                    <span className="text-[var(--text-muted)]">Vehicle</span>
+                    <br />
+                    {generatedItem?.vehicle || form.vehicle || '—'}
+                  </p>
+                  <p>
+                    <span className="text-[var(--text-muted)]">Campaign</span>
+                    <br />
+                    {generatedItem?.campaign || '—'}
                   </p>
                 </div>
 

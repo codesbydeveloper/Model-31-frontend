@@ -229,20 +229,30 @@ export default function ContentDetailPage() {
               <Info label="Language" value={item.language} />
               <Info label="Vehicle" value={item.vehicle || '—'} />
               <Info label="Offer" value={item.offer || '—'} />
+              <Info label="CTA" value={item.cta || '—'} />
               {item.rejectionReason && (
                 <Info label="Rejection Reason" value={item.rejectionReason} />
               )}
               <div>
-                <dt className="text-[var(--text-secondary)]">Body</dt>
-                <dd className="mt-1 whitespace-pre-wrap font-medium">{item.body}</dd>
+                <dt className="text-[var(--text-secondary)]">Caption</dt>
+                <dd className="mt-1 whitespace-pre-wrap font-medium">
+                  {item.caption || item.title || '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[var(--text-secondary)]">Script</dt>
+                <dd className="mt-1 whitespace-pre-wrap font-medium">
+                  {item.script || item.body}
+                </dd>
               </div>
             </dl>
           )}
         </Card>
         <ContentPreview
           platform={item.platform}
-          title={editing ? form.title : item.caption || item.title}
-          body={editing ? form.body : item.script || item.body}
+          title={editing ? form.caption || form.title : item.caption || item.title}
+          body={editing ? form.script || form.body : item.script || item.body}
+          cta={editing ? form.cta : item.cta}
           hashtags={hashtags}
           hideMedia
         />

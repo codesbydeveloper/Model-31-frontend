@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../../config/api'
+import { withLoading } from '../../context/loadingStore'
 import { apiRequest, ApiError, getAuthToken } from './http'
 import { extractList, extractItem, textValue } from './payload'
 
@@ -83,49 +84,51 @@ export async function exportOemReporting(format = 'csv', brand = '') {
   if (!isAllBrands(brand)) params.set('brand', String(brand).trim())
 
   const token = getAuthToken()
-  let response
-  try {
-    response = await fetch(
-      `${API_BASE_URL}/api/super-admin/oem-reporting/export?${params.toString()}`,
-      {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        credentials: 'include',
-      },
-    )
-  } catch {
-    throw new ApiError(
-      `Cannot reach the server. Make sure the API is running at ${API_BASE_URL}.`,
-    )
-  }
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => null)
-    throw new ApiError(
-      body?.message || body?.error || `Export failed (${response.status})`,
-      response.status,
-      body,
-    )
-  }
-
-  const disposition = response.headers.get('content-disposition') || ''
-  const match = String(disposition).match(/filename="?([^"]+)"?/i)
-  const contentType = response.headers.get('content-type') || ''
-  const wantsJson = String(format).toLowerCase() === 'json' || contentType.includes('application/json')
-
-  if (wantsJson) {
-    const payload = await response.json().catch(() => null)
-    if (payload?.success === false) {
-      throw new ApiError(payload?.message || payload?.error || 'Export failed.')
+  return withLoading(async () => {
+    let response
+    try {
+      response = await fetch(
+        `${API_BASE_URL}/api/super-admin/oem-reporting/export?${params.toString()}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: 'include',
+        },
+      )
+    } catch {
+      throw new ApiError(
+        `Cannot reach the server. Make sure the API is running at ${API_BASE_URL}.`,
+      )
     }
-    const filename = payload?.filename || match?.[1] || 'oem-reporting.json'
-    const data = payload?.oemReporting ?? payload
-    downloadBlob(
-      new Blob([`${JSON.stringify(data, null, 2)}\n`], { type: 'application/json;charset=utf-8;' }),
-      filename,
-    )
-    return
-  }
 
-  const blob = await response.blob()
-  downloadBlob(blob, match?.[1] || `oem-reporting.${String(format || 'csv').toLowerCase()}`)
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      throw new ApiError(
+        body?.message || body?.error || `Export failed (${response.status})`,
+        response.status,
+        body,
+      )
+    }
+
+    const disposition = response.headers.get('content-disposition') || ''
+    const match = String(disposition).match(/filename="?([^"]+)"?/i)
+    const contentType = response.headers.get('content-type') || ''
+    const wantsJson = String(format).toLowerCase() === 'json' || contentType.includes('application/json')
+
+    if (wantsJson) {
+      const payload = await response.json().catch(() => null)
+      if (payload?.success === false) {
+        throw new ApiError(payload?.message || payload?.error || 'Export failed.')
+      }
+      const filename = payload?.filename || match?.[1] || 'oem-reporting.json'
+      const data = payload?.oemReporting ?? payload
+      downloadBlob(
+        new Blob([`${JSON.stringify(data, null, 2)}\n`], { type: 'application/json;charset=utf-8;' }),
+        filename,
+      )
+      return
+    }
+
+    const blob = await response.blob()
+    downloadBlob(blob, match?.[1] || `oem-reporting.${String(format || 'csv').toLowerCase()}`)
+  })
 }

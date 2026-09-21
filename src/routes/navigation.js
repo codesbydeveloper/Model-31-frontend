@@ -49,6 +49,8 @@ import {
   Scale,
   FileStack,
   ClipboardCheck,
+  Wrench,
+  Camera,
 } from 'lucide-react'
 import { ROLES } from '../data/roles'
 
@@ -622,6 +624,92 @@ export const ROLE_NAVIGATION = {
       description: 'Track lead and conversion attribution.',
     },
   ],
+  [ROLES.SERVICE_ADVISOR]: [
+    {
+      label: 'Dashboard',
+      path: '/service-advisor/dashboard',
+      icon: LayoutDashboard,
+      title: 'Service Advisor',
+      subtitle: 'Today’s service appointments and repair orders.',
+      description: 'Today’s service appointments and repair orders.',
+    },
+    {
+      label: 'Appointments',
+      path: '/service-advisor/appointments',
+      icon: CalendarCheck,
+      title: 'Service Appointments',
+      subtitle: 'Customers booked for service today.',
+      description: 'Customers booked for service today.',
+    },
+    {
+      label: 'Repair Orders',
+      path: '/service-advisor/jobs',
+      icon: Wrench,
+      title: 'Repair Orders',
+      subtitle: 'Write-up and track jobs for your customers.',
+      description: 'Write-up and track jobs for your customers.',
+    },
+  ],
+  [ROLES.SERVICE_MANAGER]: [
+    {
+      label: 'Dashboard',
+      path: '/service-manager/dashboard',
+      icon: LayoutDashboard,
+      title: 'Service Manager',
+      subtitle: 'Shop performance, open jobs, and delays.',
+      description: 'Shop performance, open jobs, and delays.',
+    },
+    {
+      label: 'All Jobs',
+      path: '/service-manager/jobs',
+      icon: ClipboardList,
+      title: 'Shop Repair Orders',
+      subtitle: 'All open and completed service jobs.',
+      description: 'All open and completed service jobs.',
+    },
+    {
+      label: 'Advisors',
+      path: '/service-manager/advisors',
+      icon: Users,
+      title: 'Service Advisors',
+      subtitle: 'Advisor load, completions, and CSI.',
+      description: 'Advisor load, completions, and CSI.',
+    },
+    {
+      label: 'Delayed Jobs',
+      path: '/service-manager/delayed',
+      icon: AlertTriangle,
+      title: 'Delayed Jobs',
+      subtitle: 'Jobs waiting on parts or delayed in the shop.',
+      description: 'Jobs waiting on parts or delayed in the shop.',
+    },
+  ],
+  [ROLES.SERVICE_MERCHANDISING]: [
+    {
+      label: 'Dashboard',
+      path: '/merchandising/dashboard',
+      icon: LayoutDashboard,
+      title: 'Merchandising',
+      subtitle: 'Photos, listings, and aged inventory.',
+      description: 'Photos, listings, and aged inventory.',
+    },
+    {
+      label: 'Inventory',
+      path: '/merchandising/inventory',
+      icon: Car,
+      title: 'Merchandising Inventory',
+      subtitle: 'Vehicle photos, price, and listing status.',
+      description: 'Vehicle photos, price, and listing status.',
+    },
+    {
+      label: 'Needs Photos',
+      path: '/merchandising/photos',
+      icon: Camera,
+      title: 'Needs Photos',
+      subtitle: 'Vehicles that still need photo work.',
+      description: 'Vehicles that still need photo work.',
+    },
+  ],
 }
 
 export function getNavForRole(role) {
@@ -667,6 +755,12 @@ export function getPageTitle(pathname, role) {
   }
   if (/^\/salesperson\/appointments\/[^/]+$/.test(pathname)) {
     return 'Appointment Details'
+  }
+  if (/^\/service-advisor\/jobs\/[^/]+$/.test(pathname) || /^\/service-manager\/jobs\/[^/]+$/.test(pathname)) {
+    return 'Repair Order'
+  }
+  if (/^\/merchandising\/inventory\/[^/]+$/.test(pathname)) {
+    return 'Vehicle Merchandising'
   }
   if (/^\/salesperson\/scripts\/[^/]+$/.test(pathname)) {
     return 'Script Details'

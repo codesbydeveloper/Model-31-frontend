@@ -20,7 +20,7 @@ import { cn } from '../../utils/cn'
 import notificationService from '../../services/api/notificationService'
 
 export default function TopHeader({ onMenuClick }) {
-  const { user, logout } = useAuth()
+  const { user, logout, token } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -41,6 +41,10 @@ export default function TopHeader({ onMenuClick }) {
   }, [])
 
   useEffect(() => {
+    if (token === 'demo-token') {
+      setNotifications([])
+      return undefined
+    }
     const t = window.setTimeout(async () => {
       try {
         const rows = await notificationService.getNotifications()
@@ -50,7 +54,7 @@ export default function TopHeader({ onMenuClick }) {
       }
     }, 0)
     return () => window.clearTimeout(t)
-  }, [user?.role])
+  }, [user?.role, token])
 
   const handleLogout = () => {
     setMenuOpen(false)

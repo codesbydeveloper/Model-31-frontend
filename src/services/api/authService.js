@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../../config/api'
+import { withLoading } from '../../context/loadingStore'
 import { normalizeRole } from '../../data/roles'
 
 function initialsFromName(name = '') {
@@ -43,15 +44,17 @@ function extractPayload(body) {
 
 export async function login(email, password) {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        email: email.trim(),
-        password,
+    const response = await withLoading(() =>
+      fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
       }),
-    })
+    )
 
     const body = await response.json().catch(() => null)
 

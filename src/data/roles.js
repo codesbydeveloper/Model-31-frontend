@@ -4,6 +4,9 @@ export const ROLES = {
   BDC_MANAGER: 'BDC Manager',
   SALESPERSON: 'Salesperson',
   MARKETING_MANAGER: 'Marketing Manager',
+  SERVICE_ADVISOR: 'Service Advisor',
+  SERVICE_MANAGER: 'Service Manager',
+  SERVICE_MERCHANDISING: 'Inventory Manager',
 }
 
 export const ROLE_DASHBOARD_PATHS = {
@@ -12,6 +15,9 @@ export const ROLE_DASHBOARD_PATHS = {
   [ROLES.BDC_MANAGER]: '/bdc/dashboard',
   [ROLES.SALESPERSON]: '/salesperson/dashboard',
   [ROLES.MARKETING_MANAGER]: '/marketing/dashboard',
+  [ROLES.SERVICE_ADVISOR]: '/service-advisor/dashboard',
+  [ROLES.SERVICE_MANAGER]: '/service-manager/dashboard',
+  [ROLES.SERVICE_MERCHANDISING]: '/merchandising/dashboard',
 }
 
 export function getDashboardPathForRole(role) {
@@ -26,11 +32,17 @@ const ROLE_ALIASES = {
   SALESPERSON: ROLES.SALESPERSON,
   SALES_PERSON: ROLES.SALESPERSON,
   MARKETING_MANAGER: ROLES.MARKETING_MANAGER,
+  SERVICE_ADVISOR: ROLES.SERVICE_ADVISOR,
+  SERVICE_MANAGER: ROLES.SERVICE_MANAGER,
+  SERVICE_MERCHANDISING: ROLES.SERVICE_MERCHANDISING,
+  INVENTORY_MANAGER: ROLES.SERVICE_MERCHANDISING,
+  SERVICE_MERCHANDISING_INVENTORY_MANAGER: ROLES.SERVICE_MERCHANDISING,
+  MERCHANDISING_INVENTORY_MANAGER: ROLES.SERVICE_MERCHANDISING,
 }
 
 export function normalizeRole(role) {
   if (!role) return ''
   if (ROLE_DASHBOARD_PATHS[role]) return role
-  const key = String(role).trim().toUpperCase().replace(/[\s-]+/g, '_')
+  const key = String(role).trim().toUpperCase().replace(/[\s\-/]+/g, '_')
   return ROLE_ALIASES[key] || role
 }

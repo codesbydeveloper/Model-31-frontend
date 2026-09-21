@@ -192,8 +192,9 @@ export default function ApprovalQueuePage() {
             </div>
             <ContentPreview
               platform={review.platform}
-              title={review.title}
-              body={review.body}
+              title={review.caption || review.title}
+              body={review.script || review.body}
+              cta={review.cta}
               hashtags={review.hashtags}
               imageUrl={review.imageUrl}
             />

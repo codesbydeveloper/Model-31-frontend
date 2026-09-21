@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../../config/api'
+import { startLoading, stopLoading } from '../../context/loadingStore'
 
 const AUTH_STORAGE_KEY = 'model31_auth'
 
@@ -26,29 +27,34 @@ export async function apiRequest(path, { method = 'GET', body } = {}) {
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
 
-  let response
+  startLoading()
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      method,
-      headers,
-      credentials: 'include',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    })
-  } catch {
-    throw new ApiError(
-      `Cannot reach the server. Make sure the API is running at ${API_BASE_URL}.`,
-    )
+    let response
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        method,
+        headers,
+        credentials: 'include',
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      })
+    } catch {
+      throw new ApiError(
+        `Cannot reach the server. Make sure the API is running at ${API_BASE_URL}.`,
+      )
+    }
+
+    const payload = await response.json().catch(() => null)
+
+    if (!response.ok || payload?.success === false) {
+      throw new ApiError(
+        payload?.message || payload?.error || `Request failed (${response.status})`,
+        response.status,
+        payload,
+      )
+    }
+
+    return payload
+  } finally {
+    stopLoading()
   }
-
-  const payload = await response.json().catch(() => null)
-
-  if (!response.ok || payload?.success === false) {
-    throw new ApiError(
-      payload?.message || payload?.error || `Request failed (${response.status})`,
-      response.status,
-      payload,
-    )
-  }
-
-  return payload
 }

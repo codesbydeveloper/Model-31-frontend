@@ -6,6 +6,7 @@ export default function ContentPreview({
   platform = 'Instagram',
   title,
   body,
+  cta,
   hashtags = [],
   imageUrl,
   hideMedia = false,
@@ -50,6 +51,11 @@ export default function ContentPreview({
         >
           {body || 'The generated script will appear here.'}
         </p>
+        {cta ? (
+          <p className="mt-3 inline-flex rounded-full bg-[var(--brand-accent)] px-3 py-1.5 text-xs font-semibold text-white">
+            {cta}
+          </p>
+        ) : null}
         {hashtags?.length > 0 && (
           <p className="mt-2 text-sm text-[var(--brand-accent)]">
             {hashtags.map((tag) => (tag.startsWith('#') ? tag : `#${tag}`)).join(' ')}

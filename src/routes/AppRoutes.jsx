@@ -94,6 +94,18 @@ import CommunitiesPage from '../pages/marketing/acquisition/CommunitiesPage'
 import CommunityDetailPage from '../pages/marketing/acquisition/CommunityDetailPage'
 import FollowUpsPage from '../pages/marketing/acquisition/FollowUpsPage'
 import FollowUpDetailPage from '../pages/marketing/acquisition/FollowUpDetailPage'
+import ServiceAdvisorDashboard from '../pages/service-advisor/ServiceAdvisorDashboard'
+import ServiceAdvisorAppointmentsPage from '../pages/service-advisor/ServiceAdvisorAppointmentsPage'
+import ServiceAdvisorJobsPage from '../pages/service-advisor/ServiceAdvisorJobsPage'
+import ServiceJobDetailPage from '../pages/service/ServiceJobDetailPage'
+import ServiceManagerDashboard from '../pages/service-manager/ServiceManagerDashboard'
+import ServiceManagerJobsPage from '../pages/service-manager/ServiceManagerJobsPage'
+import ServiceManagerAdvisorsPage from '../pages/service-manager/ServiceManagerAdvisorsPage'
+import ServiceManagerDelayedPage from '../pages/service-manager/ServiceManagerDelayedPage'
+import MerchandisingDashboard from '../pages/merchandising/MerchandisingDashboard'
+import MerchandisingInventoryPage from '../pages/merchandising/MerchandisingInventoryPage'
+import MerchandisingPhotosPage from '../pages/merchandising/MerchandisingPhotosPage'
+import MerchandisingVehicleDetailPage from '../pages/merchandising/MerchandisingVehicleDetailPage'
 import { useAuth } from '../hooks/useAuth'
 import { ROLES, getDashboardPathForRole } from '../data/roles'
 
@@ -389,6 +401,28 @@ export default function AppRoutes() {
             path="marketing/acquisition/follow-ups/:id"
             element={<FollowUpDetailPage />}
           />
+        </Route>
+
+        <Route element={<RoleOutlet allowedRoles={[ROLES.SERVICE_ADVISOR]} />}>
+          <Route path="service-advisor/dashboard" element={<ServiceAdvisorDashboard />} />
+          <Route path="service-advisor/appointments" element={<ServiceAdvisorAppointmentsPage />} />
+          <Route path="service-advisor/jobs" element={<ServiceAdvisorJobsPage />} />
+          <Route path="service-advisor/jobs/:id" element={<ServiceJobDetailPage />} />
+        </Route>
+
+        <Route element={<RoleOutlet allowedRoles={[ROLES.SERVICE_MANAGER]} />}>
+          <Route path="service-manager/dashboard" element={<ServiceManagerDashboard />} />
+          <Route path="service-manager/jobs" element={<ServiceManagerJobsPage />} />
+          <Route path="service-manager/jobs/:id" element={<ServiceJobDetailPage />} />
+          <Route path="service-manager/advisors" element={<ServiceManagerAdvisorsPage />} />
+          <Route path="service-manager/delayed" element={<ServiceManagerDelayedPage />} />
+        </Route>
+
+        <Route element={<RoleOutlet allowedRoles={[ROLES.SERVICE_MERCHANDISING]} />}>
+          <Route path="merchandising/dashboard" element={<MerchandisingDashboard />} />
+          <Route path="merchandising/inventory" element={<MerchandisingInventoryPage />} />
+          <Route path="merchandising/inventory/:id" element={<MerchandisingVehicleDetailPage />} />
+          <Route path="merchandising/photos" element={<MerchandisingPhotosPage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

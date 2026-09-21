@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../../config/api'
+import { withLoading } from '../../context/loadingStore'
 import { apiRequest, ApiError, getAuthToken } from './http'
 import {
   extractList,
@@ -419,26 +420,28 @@ function downloadBlob(blob, filename) {
 
 export async function exportOemReporting(format = 'csv') {
   const token = getAuthToken()
-  const response = await fetch(
-    `${API_BASE_URL}/api/super-admin/dashboard/oem-reporting/export?format=${encodeURIComponent(format)}`,
-    {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      credentials: 'include',
-    },
-  )
-  if (!response.ok) {
-    const body = await response.json().catch(() => null)
-    throw new ApiError(
-      body?.message || body?.error || `Export failed (${response.status})`,
-      response.status,
-      body,
+  return withLoading(async () => {
+    const response = await fetch(
+      `${API_BASE_URL}/api/super-admin/dashboard/oem-reporting/export?format=${encodeURIComponent(format)}`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
+      },
     )
-  }
-  const blob = await response.blob()
-  const match = String(response.headers.get('content-disposition') || '').match(
-    /filename="?([^"]+)"?/i,
-  )
-  downloadBlob(blob, match?.[1] || `oem.${format}`)
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      throw new ApiError(
+        body?.message || body?.error || `Export failed (${response.status})`,
+        response.status,
+        body,
+      )
+    }
+    const blob = await response.blob()
+    const match = String(response.headers.get('content-disposition') || '').match(
+      /filename="?([^"]+)"?/i,
+    )
+    downloadBlob(blob, match?.[1] || `oem.${format}`)
+  })
 }
 
 export async function getUnderwaterRescue() {

@@ -110,7 +110,7 @@ export function mapMarketingContent(raw) {
     brief: textValue(raw.brief),
     script: textValue(raw.script || raw.body || preview.body),
     caption: textValue(raw.caption || raw.title || preview.title),
-    cta: textValue(raw.cta || raw.callToAction),
+    cta: textValue(raw.cta || raw.callToAction || preview.cta),
     body: textValue(raw.script || raw.body || preview.body),
     title: textValue(raw.caption || raw.title || preview.title),
     hashtags,

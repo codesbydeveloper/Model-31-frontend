@@ -33,6 +33,12 @@ export function statusVariant(status = '') {
       'retried',
       'verified',
       '✓ verified',
+      'checked in',
+      'in work',
+      'ready',
+      'delivered',
+      'live',
+      'processed',
       'high',
       'deal ready',
       'manager accepted',
@@ -77,6 +83,9 @@ export function statusVariant(status = '') {
       'processing',
       'manager review',
       'qualified',
+      'needs photos',
+      'waiting on parts',
+      'delayed',
     ].includes(value)
   ) {
     return 'pending'

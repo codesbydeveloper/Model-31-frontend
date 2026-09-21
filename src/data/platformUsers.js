@@ -95,6 +95,9 @@ export const USER_ROLES = [
   'BDC Manager',
   'Salesperson',
   'Marketing Manager',
+  'Service Advisor',
+  'Service Manager',
+  'Inventory Manager',
 ]
 
 export const USER_STATUSES = ['Active', 'Inactive', 'Suspended']
