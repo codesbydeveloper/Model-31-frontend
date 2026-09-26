@@ -5,9 +5,10 @@ import { formatNumber, formatPercent } from '../../utils/table'
 import PlatformBadge from './PlatformBadge'
 
 export default function SocialPlatformCard({ account, onConnect, onDisconnect, onSettings }) {
-  const canConnect = account.canConnect ?? account.status !== 'CONNECTED'
-  const canSettings = account.canSettings ?? account.status === 'CONNECTED'
-  const canDisconnect = account.canDisconnect ?? account.status === 'CONNECTED'
+  const disconnected = String(account.status || '').toUpperCase() !== 'CONNECTED'
+  const canConnect = account.canConnect ?? disconnected
+  const canDisconnect = account.canDisconnect ?? !disconnected
+  const canSettings = account.canSettings ?? !disconnected
   return (
     <Card>
       <div className="flex items-start justify-between gap-2">

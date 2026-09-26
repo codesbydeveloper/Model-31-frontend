@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { ExternalLink } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Button from '../../components/common/Button'
@@ -9,6 +10,7 @@ import Toggle from '../../components/common/Toggle'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import ConfirmModal from '../../components/common/ConfirmModal'
 import SocialPlatformCard from '../../components/marketing/SocialPlatformCard'
+import EmptyState from '../../components/ui/EmptyState'
 import { useToast } from '../../hooks/useToast'
 import { CONTENT_TYPES, LANGUAGES } from '../../data/marketingContent'
 import {
@@ -19,25 +21,31 @@ import {
   disconnectSocialAccount,
 } from '../../services/api/marketingSocialService'
 
-const DEFAULT_ENVIRONMENTS = ['Production', 'Sandbox']
 const DEFAULT_TIMEZONES = ['America/New_York', 'America/Chicago', 'America/Los_Angeles']
+
+function initialConnectValues(fields, account) {
+  const values = {}
+  fields.forEach((field) => {
+    if (field.name === 'accountName') {
+      values[field.name] = account?.accountName || ''
+      return
+    }
+    values[field.name] = ''
+  })
+  return values
+}
 
 export default function SocialAccountsPage() {
   const { showToast } = useToast()
   const [accounts, setAccounts] = useState([])
-  const [environments, setEnvironments] = useState(DEFAULT_ENVIRONMENTS)
   const [loading, setLoading] = useState(true)
   const [connectOpen, setConnectOpen] = useState(false)
+  const [connectValues, setConnectValues] = useState({})
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [disconnectTarget, setDisconnectTarget] = useState(null)
   const [active, setActive] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [form, setForm] = useState({
-    platform: 'Instagram',
-    accountName: '',
-    environment: 'Production',
-  })
   const [settings, setSettings] = useState(null)
   const [settingsOptions, setSettingsOptions] = useState({
     contentTypes: CONTENT_TYPES,
@@ -50,9 +58,6 @@ export default function SocialAccountsPage() {
     try {
       const result = await getSocialAccounts()
       setAccounts(result.items)
-      if (result.options.environments?.length) {
-        setEnvironments(result.options.environments)
-      }
     } catch (err) {
       setAccounts([])
       showToast(err.message || 'Unable to load social accounts.', 'error')
@@ -65,6 +70,39 @@ export default function SocialAccountsPage() {
     const t = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(t)
   }, [load])
+
+  const closeConnect = () => {
+    setConnectOpen(false)
+    setConnectValues({})
+    setActive(null)
+  }
+
+  const openConnect = (account) => {
+    if (!account?.id) {
+      showToast('This account has no id. Reload Social Accounts and try again.', 'error')
+      return
+    }
+    const fields = account.connectForm?.fields || []
+    setActive(account)
+    setConnectValues(initialConnectValues(fields, account))
+    setConnectOpen(true)
+  }
+
+  const submitConnect = async (event) => {
+    event.preventDefault()
+    if (!active?.id) return
+    setBusy(true)
+    try {
+      await connectSocialAccount(active.id, connectValues, active.connectUrl)
+      showToast(`${active.platform || 'Account'} connected.`)
+      closeConnect()
+      await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to connect account.', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const openSettings = async (account) => {
     setActive(account)
@@ -123,6 +161,12 @@ export default function SocialAccountsPage() {
     }
   }
 
+  const setConnectField = (name, value) => {
+    setConnectValues((current) => ({ ...current, [name]: value }))
+  }
+
+  const connectForm = active?.connectForm
+
   return (
     <div className="mx-auto w-full max-w-7xl">
       <Breadcrumbs />
@@ -135,21 +179,18 @@ export default function SocialAccountsPage() {
         <div className="flex justify-center py-16">
           <LoadingSpinner size={28} />
         </div>
+      ) : accounts.length === 0 ? (
+        <EmptyState
+          title="No social accounts yet"
+          description="Accounts will appear here after the list API returns platforms to connect."
+        />
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {accounts.map((account) => (
             <SocialPlatformCard
-              key={account.id}
+              key={account.id || account.platform}
               account={account}
-              onConnect={(acc) => {
-                setActive(acc)
-                setForm({
-                  platform: acc.platform,
-                  accountName: acc.accountName || '',
-                  environment: acc.environment || 'Production',
-                })
-                setConnectOpen(true)
-              }}
+              onConnect={openConnect}
               onDisconnect={setDisconnectTarget}
               onSettings={openSettings}
             />
@@ -157,50 +198,85 @@ export default function SocialAccountsPage() {
         </div>
       )}
 
-      <Modal open={connectOpen} onClose={() => setConnectOpen(false)} title="Connect Account">
-        <form
-          className="grid gap-3"
-          onSubmit={async (e) => {
-            e.preventDefault()
-            if (!active) return
-            setBusy(true)
-            try {
-              await connectSocialAccount(active.id, form)
-              setConnectOpen(false)
-              showToast(`${form.platform} connected.`)
-              await load()
-            } catch (err) {
-              showToast(err.message || 'Unable to connect account.', 'error')
-            } finally {
-              setBusy(false)
+      <Modal
+        open={connectOpen && Boolean(active)}
+        onClose={closeConnect}
+        title={connectForm?.title || (active?.platform ? `Connect ${active.platform}` : 'Connect Account')}
+        className="max-w-xl"
+      >
+        <form className="grid gap-3" onSubmit={submitConnect}>
+          {connectForm?.clientAsk ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+              <p>{connectForm.clientAsk}</p>
+              {connectForm.helpUrl ? (
+                <a
+                  href={connectForm.helpUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 font-medium text-amber-900 underline"
+                >
+                  {connectForm.helpUrl}
+                  <ExternalLink size={14} />
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+          {(connectForm?.fields || []).map((field) => {
+            if (field.type === 'textarea') {
+              return (
+                <div key={field.name} className="flex flex-col gap-1.5">
+                  <label htmlFor={field.name} className="text-sm font-medium">
+                    {field.label}
+                  </label>
+                  <textarea
+                    id={field.name}
+                    name={field.name}
+                    className="input-field min-h-20"
+                    value={connectValues[field.name] || ''}
+                    onChange={(event) => setConnectField(field.name, event.target.value)}
+                    required={field.required}
+                    placeholder={field.placeholder}
+                  />
+                  {field.help ? (
+                    <p className="text-xs text-[var(--text-secondary)]">{field.help}</p>
+                  ) : null}
+                </div>
+              )
             }
-          }}
-        >
-          <Input label="Platform" value={form.platform} readOnly />
-          <Input
-            label="Account Name"
-            value={form.accountName}
-            onChange={(e) => setForm({ ...form, accountName: e.target.value })}
-            required
-          />
-          <Select
-            label="Environment"
-            value={form.environment}
-            onChange={(e) => setForm({ ...form, environment: e.target.value })}
-            options={environments.map((env) => ({ value: env, label: env }))}
-          />
+            return (
+              <div key={field.name} className="grid gap-1">
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  label={field.label}
+                  type={field.type === 'password' ? 'password' : field.type}
+                  value={connectValues[field.name] || ''}
+                  onChange={(event) => setConnectField(field.name, event.target.value)}
+                  required={field.required}
+                  placeholder={field.placeholder}
+                  autoComplete={field.type === 'password' ? 'new-password' : 'off'}
+                />
+                {field.help ? (
+                  <p className="text-xs text-[var(--text-secondary)]">{field.help}</p>
+                ) : null}
+              </div>
+            )
+          })}
+          <p className="text-xs text-[var(--text-secondary)]">
+            Enter the developer app keys from the client. Do not enter the social account password.
+          </p>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setConnectOpen(false)}>
+            <Button type="button" variant="secondary" onClick={closeConnect}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button type="submit" disabled={busy || !(connectForm?.fields || []).length}>
               {busy ? (
                 <>
                   <LoadingSpinner size={16} />
                   Connecting…
                 </>
               ) : (
-                'Connect Account'
+                'Connect'
               )}
             </Button>
           </div>
@@ -208,7 +284,7 @@ export default function SocialAccountsPage() {
       </Modal>
 
       <Modal
-        open={settingsOpen && Boolean(active)}
+        open={settingsOpen && Boolean(active) && !connectOpen}
         onClose={() => setSettingsOpen(false)}
         title="Social Settings"
       >
@@ -279,7 +355,7 @@ export default function SocialAccountsPage() {
           if (!disconnectTarget) return
           setBusy(true)
           try {
-            await disconnectSocialAccount(disconnectTarget.id)
+            await disconnectSocialAccount(disconnectTarget.id, disconnectTarget.disconnectUrl)
             setDisconnectTarget(null)
             showToast('Account disconnected.')
             await load()
