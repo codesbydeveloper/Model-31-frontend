@@ -40,6 +40,9 @@ import NegotiationTemplateDetailPage from '../pages/super-admin/NegotiationTempl
 import DealHandoffsPage from '../pages/super-admin/DealHandoffsPage'
 import DealHandoffDetailPage from '../pages/super-admin/DealHandoffDetailPage'
 import OemReportingPage from '../pages/super-admin/OemReportingPage'
+import Model31EnginePage from '../pages/super-admin/Model31EnginePage'
+import TrustPortalPage from '../pages/trust/TrustPortalPage'
+import TrustInvoicePage from '../pages/trust/TrustInvoicePage'
 import DealershipDashboard from '../pages/dealership/DealershipDashboard'
 import DealershipCrmPage from '../pages/dealership/DealershipCrmPage'
 import DealershipSocialPage from '../pages/dealership/DealershipSocialPage'
@@ -228,6 +231,15 @@ export default function AppRoutes() {
             path="super-admin/pipeline-transparency/:id"
             element={<PipelineTransparencyDetailPage />}
           />
+          <Route path="super-admin/model31" element={<Model31EnginePage />} />
+          <Route
+            path="super-admin/trust"
+            element={<TrustPortalPage invoiceBase="/super-admin/trust" />}
+          />
+          <Route
+            path="super-admin/trust/:id"
+            element={<TrustInvoicePage listPath="/super-admin/trust" />}
+          />
           <Route
             path="super-admin/negotiation-control"
             element={<NegotiationControlPage />}
@@ -279,6 +291,14 @@ export default function AppRoutes() {
           <Route path="dealership/crm" element={<DealershipCrmPage />} />
           <Route path="dealership/content" element={<DealershipContentPage />} />
           <Route path="dealership/reports" element={<DealershipReportsPage />} />
+          <Route
+            path="dealership/trust"
+            element={<TrustPortalPage invoiceBase="/dealership/trust" />}
+          />
+          <Route
+            path="dealership/trust/:id"
+            element={<TrustInvoicePage listPath="/dealership/trust" />}
+          />
           <Route
             path="dealership/settings"
             element={<DealershipSettingsPage />}

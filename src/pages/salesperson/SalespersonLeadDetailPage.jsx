@@ -19,6 +19,7 @@ import MarkSoldModal from './leads/MarkSoldModal'
 import AcquisitionSignalsCard from '../../components/acquisition/AcquisitionSignalsCard'
 import LeadClassificationCard from '../../components/leads/LeadClassificationCard'
 import PipelineBadge from '../../components/common/PipelineBadge'
+import { statusGuardMessage } from '../../utils/statusGuard'
 
 function formatTime(time) {
   if (!time) return ''
@@ -43,6 +44,7 @@ export default function SalespersonLeadDetailPage() {
   const [statusOpen, setStatusOpen] = useState(false)
   const [status, setStatus] = useState('NEW')
   const [statusSaving, setStatusSaving] = useState(false)
+  const [guardMessage, setGuardMessage] = useState('')
   const [apptOpen, setApptOpen] = useState(false)
   const [soldOpen, setSoldOpen] = useState(false)
   const [notSoldOpen, setNotSoldOpen] = useState(false)
@@ -101,6 +103,7 @@ export default function SalespersonLeadDetailPage() {
 
   const saveStatus = async () => {
     setStatusSaving(true)
+    setGuardMessage('')
     try {
       const updated = await salespersonPortalService.updateMyLeadStatus(id, status)
       if (updated && updated !== true) setLead(updated)
@@ -108,6 +111,13 @@ export default function SalespersonLeadDetailPage() {
       setStatusOpen(false)
       showToast('Status updated.')
     } catch (err) {
+      const blocked = statusGuardMessage(err)
+      if (blocked) {
+        setGuardMessage(blocked)
+        showToast(blocked, 'error')
+        await load()
+        return
+      }
       showToast(err.message || 'Unable to update status.', 'error')
     } finally {
       setStatusSaving(false)
@@ -116,6 +126,7 @@ export default function SalespersonLeadDetailPage() {
 
   const markNotSold = async () => {
     setActionBusy(true)
+    setGuardMessage('')
     try {
       const updated = await salespersonPortalService.markMyLeadNotSold(id)
       if (updated && updated !== true) setLead(updated)
@@ -123,6 +134,14 @@ export default function SalespersonLeadDetailPage() {
       setNotSoldOpen(false)
       showToast('Lead marked as not sold.')
     } catch (err) {
+      const blocked = statusGuardMessage(err)
+      if (blocked) {
+        setGuardMessage(blocked)
+        setNotSoldOpen(false)
+        showToast(blocked, 'error')
+        await load()
+        return
+      }
       showToast(err.message || 'Unable to mark as not sold.', 'error')
     } finally {
       setActionBusy(false)
@@ -173,6 +192,15 @@ export default function SalespersonLeadDetailPage() {
           </div>
         }
       />
+
+      {guardMessage ? (
+        <div
+          role="alert"
+          className="mb-4 rounded-[var(--radius-md)] border border-[var(--status-error)]/30 bg-[var(--status-error-bg)] px-4 py-3 text-sm text-[var(--status-error)]"
+        >
+          {guardMessage}
+        </div>
+      ) : null}
 
       <div className="mb-4">
         <LeadClassificationCard lead={lead} />

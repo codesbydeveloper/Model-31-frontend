@@ -47,6 +47,8 @@ import {
   Split,
   Workflow,
   Scale,
+  ShieldCheck,
+  Receipt,
   FileStack,
   ClipboardCheck,
   Wrench,
@@ -223,6 +225,22 @@ export const ROLE_NAVIGATION = {
       description: 'Monitor the separation between Model 31 leads and dealership leads.',
     },
     {
+      label: 'Model 31 Engine',
+      path: '/super-admin/model31',
+      icon: ShieldCheck,
+      title: 'Model 31 Engine',
+      subtitle: 'Read-only view of the sealed engine, hygiene, routing, and guardrails.',
+      description: 'Read-only view of the sealed engine, hygiene, routing, and guardrails.',
+    },
+    {
+      label: 'Trust Portal',
+      path: '/super-admin/trust',
+      icon: Receipt,
+      title: 'Trust Portal',
+      subtitle: 'Sold-car proof and $31 invoices.',
+      description: 'Upload a sold log, match buyers, and review influenced sales.',
+    },
+    {
       label: 'Negotiation Control',
       path: '/super-admin/negotiation-control',
       icon: Scale,
@@ -331,6 +349,14 @@ export const ROLE_NAVIGATION = {
       title: 'Reports',
       subtitle: 'Dealership Reports',
       description: 'View dealership performance reports.',
+    },
+    {
+      label: 'Trust Portal',
+      path: '/dealership/trust',
+      icon: Receipt,
+      title: 'Trust Portal',
+      subtitle: 'Your store’s sold-car proof and $31 invoices.',
+      description: 'Upload your store’s sold log and review influenced sales.',
     },
     {
       label: 'Settings',
@@ -807,6 +833,9 @@ export function getPageTitle(pathname, role) {
   if (/^\/super-admin\/deal-handoffs\/[^/]+$/.test(pathname)) {
     return 'Deal Handoff'
   }
+  if (/^\/super-admin\/trust\/[^/]+$/.test(pathname) || /^\/dealership\/trust\/[^/]+$/.test(pathname)) {
+    return 'Invoice proof'
+  }
   const item = findNavItemByPath(pathname, role)
   if (item) return item.title
   if (pathname === '/profile') return 'Profile'
@@ -969,6 +998,20 @@ export function buildBreadcrumbs(pathname, role) {
     return [
       { label: 'Deal Handoffs', path: '/super-admin/deal-handoffs' },
       { label: 'Deal Handoff', path: pathname },
+    ]
+  }
+
+  if (/^\/super-admin\/trust\/[^/]+$/.test(pathname)) {
+    return [
+      { label: 'Trust Portal', path: '/super-admin/trust' },
+      { label: 'Invoice proof', path: pathname },
+    ]
+  }
+
+  if (/^\/dealership\/trust\/[^/]+$/.test(pathname)) {
+    return [
+      { label: 'Trust Portal', path: '/dealership/trust' },
+      { label: 'Invoice proof', path: pathname },
     ]
   }
 

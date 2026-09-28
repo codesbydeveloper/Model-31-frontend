@@ -16,6 +16,7 @@ import { useToast } from '../../hooks/useToast'
 import { LEAD_STATUSES } from '../../data/leads'
 import dealershipLeadService from '../../services/api/dealershipLeadService'
 import dealershipSalespersonService from '../../services/api/dealershipSalespersonService'
+import { statusGuardMessage } from '../../utils/statusGuard'
 
 const PAGE_SIZE = 10
 const SEARCH_DEBOUNCE_MS = 400
@@ -34,6 +35,7 @@ export default function DealershipLeadsPage() {
   const [people, setPeople] = useState([])
   const [selectedPerson, setSelectedPerson] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [guardMessage, setGuardMessage] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -88,12 +90,20 @@ export default function DealershipLeadsPage() {
   const saveStatus = async () => {
     if (!statusLead) return
     setSaving(true)
+    setGuardMessage('')
     try {
       await dealershipLeadService.updateDealershipLeadStatus(statusLead.id, statusValue)
       showToast('Lead status updated.')
       setStatusLead(null)
       await load()
     } catch (err) {
+      const blocked = statusGuardMessage(err)
+      if (blocked) {
+        setGuardMessage(blocked)
+        showToast(blocked, 'error')
+        await load()
+        return
+      }
       showToast(err.message || 'Unable to update status.', 'error')
     } finally {
       setSaving(false)
@@ -150,6 +160,7 @@ export default function DealershipLeadsPage() {
               size="sm"
               variant="ghost"
               onClick={() => {
+                setGuardMessage('')
                 setStatusValue(row.status)
                 setStatusLead(row)
               }}
@@ -207,6 +218,14 @@ export default function DealershipLeadsPage() {
         onClose={() => !saving && setStatusLead(null)}
         title="Change Status"
       >
+        {guardMessage ? (
+          <div
+            role="alert"
+            className="mb-3 rounded-[var(--radius-md)] border border-[var(--status-error)]/30 bg-[var(--status-error-bg)] px-3 py-2.5 text-sm text-[var(--status-error)]"
+          >
+            {guardMessage}
+          </div>
+        ) : null}
         <Select
           label="Lead Status"
           value={statusValue}

@@ -6,6 +6,7 @@ import LoadingSpinner from '../../../components/common/LoadingSpinner'
 import { LEAD_STATUSES } from '../../../data/leads'
 import leadService from '../../../services/api/leadService'
 import { useToast } from '../../../hooks/useToast'
+import { statusGuardMessage } from '../../../utils/statusGuard'
 
 export default function ChangeStatusModal({ open, lead, onClose, onChanged }) {
   if (!open || !lead) return null
@@ -24,13 +25,22 @@ function ChangeStatusForm({ lead, onClose, onChanged }) {
   const { showToast } = useToast()
   const [status, setStatus] = useState(lead.status)
   const [saving, setSaving] = useState(false)
+  const [guardMessage, setGuardMessage] = useState('')
 
   const submit = async () => {
     setSaving(true)
+    setGuardMessage('')
     try {
       await leadService.updateLeadStatus(lead.id, status)
       await onChanged?.()
     } catch (err) {
+      const blocked = statusGuardMessage(err)
+      if (blocked) {
+        setGuardMessage(blocked)
+        showToast(blocked, 'error')
+        await onChanged?.()
+        return
+      }
       showToast(err.message || 'Unable to change status.', 'error')
     } finally {
       setSaving(false)
@@ -39,6 +49,14 @@ function ChangeStatusForm({ lead, onClose, onChanged }) {
 
   return (
     <Modal open onClose={saving ? () => {} : onClose} title="Change Status">
+      {guardMessage ? (
+        <div
+          role="alert"
+          className="mb-3 rounded-[var(--radius-md)] border border-[var(--status-error)]/30 bg-[var(--status-error-bg)] px-3 py-2.5 text-sm text-[var(--status-error)]"
+        >
+          {guardMessage}
+        </div>
+      ) : null}
       <Select
         label="Lead Status"
         value={status}
