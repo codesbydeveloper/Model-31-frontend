@@ -2,6 +2,25 @@ import { API_BASE_URL } from '../../config/api'
 import { startLoading, stopLoading } from '../../context/loadingStore'
 
 const AUTH_STORAGE_KEY = 'model31_auth'
+const LEGACY_USER_KEY = 'autoflow_user'
+const LEGACY_TOKEN_KEY = 'autoflow_token'
+
+let redirectingToLogin = false
+
+function expireSession() {
+  if (redirectingToLogin) return
+  redirectingToLogin = true
+  try {
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    localStorage.removeItem(LEGACY_USER_KEY)
+    localStorage.removeItem(LEGACY_TOKEN_KEY)
+  } catch {
+    // Ignore storage failures in private mode
+  }
+  if (window.location.pathname !== '/login') {
+    window.location.replace('/login')
+  }
+}
 
 export class ApiError extends Error {
   constructor(message, status = 0, body = null) {
@@ -23,8 +42,9 @@ export function getAuthToken() {
 
 export async function apiRequest(path, { method = 'GET', body } = {}) {
   const token = getAuthToken()
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
   const headers = {}
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (body !== undefined && !isFormData) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
 
   startLoading()
@@ -35,7 +55,7 @@ export async function apiRequest(path, { method = 'GET', body } = {}) {
         method,
         headers,
         credentials: 'include',
-        body: body !== undefined ? JSON.stringify(body) : undefined,
+        body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,
       })
     } catch {
       throw new ApiError(
@@ -44,6 +64,10 @@ export async function apiRequest(path, { method = 'GET', body } = {}) {
     }
 
     const payload = await response.json().catch(() => null)
+
+    if (response.status === 401 && !String(path).startsWith('/api/auth/login')) {
+      expireSession()
+    }
 
     if (!response.ok || payload?.success === false) {
       throw new ApiError(

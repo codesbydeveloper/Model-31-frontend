@@ -9,6 +9,7 @@ export default function Modal({
   title,
   children,
   className = '',
+  overlayClassName = 'z-50',
 }) {
   useEffect(() => {
     if (!open) return undefined
@@ -29,7 +30,7 @@ export default function Modal({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={cn('fixed inset-0 flex items-center justify-center p-4', overlayClassName)}>
       <button
         type="button"
         aria-label="Close modal overlay"

@@ -45,146 +45,23 @@ function toApiPath(url) {
   }
 }
 
-function mapConnectField(raw) {
-  if (!raw) return null
-  if (typeof raw === 'string') {
-    return { name: raw, label: raw, required: false, type: 'text', placeholder: '', help: '' }
-  }
-  if (typeof raw !== 'object') return null
-  const name = textValue(raw.name || raw.key || raw.id || raw.field)
-  if (!name) return null
-  const label = textValue(raw.label) || name
-  const rawType = String(raw.type || 'text').toLowerCase()
-  const looksSecret = rawType === 'password' || rawType === 'secret' || /secret/i.test(name) || /secret/i.test(label)
-  const type = looksSecret
-    ? 'password'
-    : rawType === 'textarea' || rawType === 'url' || rawType === 'email' || rawType === 'number'
-      ? rawType
-      : 'text'
-  return {
-    name,
-    label,
-    required: Boolean(raw.required),
-    type,
-    placeholder: textValue(raw.placeholder),
-    help: textValue(raw.help || raw.hint || raw.description),
-  }
-}
-
-function isUserSocialPassword(field) {
-  const name = String(field?.name || '').toLowerCase()
-  const label = String(field?.label || '').toLowerCase()
-  if (/app|client|api|secret|key/.test(name) || /app|client|api|secret/.test(label)) return false
-  return name === 'password' || (label.includes('password') && !label.includes('secret'))
+function missingEnvNames(source) {
+  const raw = source.missingEnv ?? source.missing_env ?? []
+  const list = Array.isArray(raw) ? raw : String(raw || '').split(',')
+  return list
+    .map((item) => (typeof item === 'string' ? item.trim() : textValue(item?.name || item?.key || item)))
+    .filter(Boolean)
 }
 
 export function mapConnectForm(raw, platform) {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
-  const fields = extractList(source, ['fields'])
-    .map(mapConnectField)
-    .filter(Boolean)
-    .filter((field) => !isUserSocialPassword(field))
-  const fallback = fallbackConnectForm(platform)
+  const configured = source.credentialsConfigured ?? source.credentials_configured
   return {
-    title: textValue(source.title) || fallback.title,
-    clientAsk: textValue(source.clientAsk || source.client_ask) || fallback.clientAsk,
-    helpUrl: textValue(source.helpUrl || source.help_url || source.helpURL) || fallback.helpUrl,
-    fields: fields.length ? fields : fallback.fields,
-  }
-}
-
-export function fallbackConnectForm(platform) {
-  const name = textValue(platform) || 'Account'
-  const key = name.toLowerCase()
-  const field = (fieldName, label, required = true, type = 'text') => ({
-    name: fieldName,
-    label,
-    required,
-    type,
-    placeholder: '',
-    help: '',
-  })
-
-  if (key === 'instagram' || key === 'facebook') {
-    return {
-      title: `Connect ${name}`,
-      clientAsk:
-        'Ask the client for Meta App ID + App Secret + Page/account name. Instagram must be a Business account linked to a Facebook Page.',
-      helpUrl: 'https://developers.facebook.com',
-      fields: [
-        field('appId', 'App ID'),
-        field('appSecret', 'App Secret', true, 'password'),
-        field('accountName', 'Account Name'),
-        field('pageId', 'Page ID', false),
-      ],
-    }
-  }
-  if (key === 'whatsapp') {
-    return {
-      title: 'Connect WhatsApp',
-      clientAsk: 'Ask the client for Meta App ID + App Secret + Business Account ID + Phone Number ID.',
-      helpUrl: 'https://developers.facebook.com',
-      fields: [
-        field('appId', 'App ID'),
-        field('appSecret', 'App Secret', true, 'password'),
-        field('businessAccountId', 'Business Account ID'),
-        field('phoneNumberId', 'Phone Number ID'),
-      ],
-    }
-  }
-  if (key === 'tiktok') {
-    return {
-      title: 'Connect TikTok',
-      clientAsk: 'Ask the client for TikTok Client Key + Client Secret.',
-      helpUrl: '',
-      fields: [
-        field('clientKey', 'Client Key'),
-        field('clientSecret', 'Client Secret', true, 'password'),
-        field('accountName', 'Account Name', false),
-      ],
-    }
-  }
-  if (key === 'youtube') {
-    return {
-      title: 'Connect YouTube',
-      clientAsk: 'Ask the client for Google Client ID + Client Secret.',
-      helpUrl: '',
-      fields: [
-        field('clientId', 'Client ID'),
-        field('clientSecret', 'Client Secret', true, 'password'),
-        field('accountName', 'Account Name', false),
-      ],
-    }
-  }
-  if (key === 'x' || key === 'twitter') {
-    return {
-      title: 'Connect X',
-      clientAsk: 'Ask the client for X Client ID + Client Secret.',
-      helpUrl: '',
-      fields: [
-        field('clientId', 'Client ID'),
-        field('clientSecret', 'Client Secret', true, 'password'),
-        field('accountName', 'Account Name', false),
-      ],
-    }
-  }
-  if (key === 'whatnot') {
-    return {
-      title: 'Connect Whatnot',
-      clientAsk: 'Ask the client for Whatnot Client ID + Client Secret (if they have an app).',
-      helpUrl: '',
-      fields: [
-        field('clientId', 'Client ID'),
-        field('clientSecret', 'Client Secret', true, 'password'),
-        field('accountName', 'Account Name', false),
-      ],
-    }
-  }
-  return {
-    title: `Connect ${name}`,
-    clientAsk: 'Ask the client for this network’s developer app keys. Do not ask for the social account password.',
-    helpUrl: '',
-    fields: [field('accountName', 'Account Name')],
+    title: textValue(source.title) || `Connect ${textValue(platform) || 'account'}`,
+    fields: [],
+    credentialsConfigured: configured === undefined ? true : configured === true || configured === 'true',
+    missingEnv: missingEnvNames(source),
+    submitUrl: toApiPath(source.submitUrl || source.submit_url),
   }
 }
 
@@ -216,8 +93,8 @@ export function mapSocialAccount(raw) {
     defaultTimezone: textValue(raw.defaultTimezone) || 'America/New_York',
     environment: textValue(raw.environment) || 'Production',
     connectForm: mapConnectForm(raw.connectForm, platform),
-    connectUrl: toApiPath(raw.connectUrl) || (raw.id || raw._id ? `/api/marketing/social-accounts/${raw.id || raw._id}/connect` : ''),
-    disconnectUrl: toApiPath(raw.disconnectUrl) || (raw.id || raw._id ? `/api/marketing/social-accounts/${raw.id || raw._id}/disconnect` : ''),
+    connectUrl: socialActionUrl(raw, 'connect'),
+    disconnectUrl: socialActionUrl(raw, 'disconnect'),
     canConnect: Boolean(raw.canConnect ?? !connected),
     canDisconnect: Boolean(raw.canDisconnect ?? connected),
     canSettings: Boolean(raw.canSettings ?? connected),
@@ -267,14 +144,6 @@ function extractAccountList(payload) {
   ))
 }
 
-export function connectPayload(form = {}) {
-  const body = {}
-  Object.entries(form).forEach(([key, value]) => {
-    body[key] = typeof value === 'string' ? value.trim() : value ?? ''
-  })
-  return body
-}
-
 const DEFAULT_SOCIAL_PLATFORMS = [
   'Facebook',
   'Instagram',
@@ -285,15 +154,21 @@ const DEFAULT_SOCIAL_PLATFORMS = [
   'Whatnot',
 ]
 
-function platformCardsFromOptions(platforms) {
-  const names = platforms.length ? platforms : DEFAULT_SOCIAL_PLATFORMS
-  return names
-    .map((platform) => mapSocialAccount({
-      id: platform,
-      platform,
-      status: 'DISCONNECTED',
-    }))
-    .filter(Boolean)
+function isBackendSocialId(id) {
+  const value = textValue(id)
+  if (!value) return false
+  return !DEFAULT_SOCIAL_PLATFORMS.some((platform) => platform.toLowerCase() === value.toLowerCase())
+}
+
+function socialActionUrl(raw, action) {
+  const formUrl = action === 'connect'
+    ? raw.connectForm?.submitUrl || raw.submitUrl || raw.connectUrl
+    : raw.disconnectUrl
+  const fromApi = toApiPath(formUrl)
+  if (fromApi) return fromApi
+  const id = raw.id || raw._id
+  if (!isBackendSocialId(id)) return ''
+  return `/api/marketing/social-accounts/${id}/${action}`
 }
 
 export async function getSocialAccounts() {
@@ -302,10 +177,10 @@ export async function getSocialAccounts() {
   const items = extractAccountList(payload)
     .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
     .map(mapSocialAccount)
-    .filter(Boolean)
+    .filter((account) => account && isBackendSocialId(account.id))
 
   return {
-    items: items.length ? items : platformCardsFromOptions(options.platforms),
+    items,
     options,
   }
 }
@@ -326,11 +201,14 @@ export async function updateSocialSettings(id, form) {
   return mapSocialAccount(extractItem(payload, ['account', 'item']))
 }
 
-export async function connectSocialAccount(id, form, connectUrl) {
-  const path = toApiPath(connectUrl) || `/api/marketing/social-accounts/${id}/connect`
+export async function connectSocialAccount(id, connectUrl) {
+  const path = toApiPath(connectUrl) || (isBackendSocialId(id) ? `/api/marketing/social-accounts/${id}/connect` : '')
+  if (!path || !/\/social-accounts\/[^/]+\/connect$/i.test(path) || /\/social-accounts\/(facebook|instagram|whatsapp|tiktok|youtube|x|whatnot)\/connect$/i.test(path)) {
+    throw new Error('Reload Social Accounts. Connect must use the account id from the server, not the platform name.')
+  }
   const payload = await apiRequest(path, {
     method: 'POST',
-    body: connectPayload(form),
+    body: {},
   })
   return mapSocialAccount(extractItem(payload, ['account', 'item']))
 }

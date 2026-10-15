@@ -14,7 +14,12 @@ export default function ConfirmModal({
   danger = false,
 }) {
   return (
-    <Modal open={open} onClose={loading ? () => {} : onClose} title={title}>
+    <Modal
+      open={open}
+      onClose={loading ? () => {} : onClose}
+      title={title}
+      overlayClassName="z-[80]"
+    >
       <p className="text-sm text-[var(--text-secondary)]">{message}</p>
       <div className="mt-5 flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={onClose} disabled={loading}>

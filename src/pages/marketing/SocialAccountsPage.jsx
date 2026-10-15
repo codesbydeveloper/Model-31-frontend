@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ExternalLink } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Button from '../../components/common/Button'
@@ -23,24 +22,11 @@ import {
 
 const DEFAULT_TIMEZONES = ['America/New_York', 'America/Chicago', 'America/Los_Angeles']
 
-function initialConnectValues(fields, account) {
-  const values = {}
-  fields.forEach((field) => {
-    if (field.name === 'accountName') {
-      values[field.name] = account?.accountName || ''
-      return
-    }
-    values[field.name] = ''
-  })
-  return values
-}
-
 export default function SocialAccountsPage() {
   const { showToast } = useToast()
   const [accounts, setAccounts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [connectOpen, setConnectOpen] = useState(false)
-  const [connectValues, setConnectValues] = useState({})
+  const [missingNotice, setMissingNotice] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [disconnectTarget, setDisconnectTarget] = useState(null)
@@ -71,31 +57,24 @@ export default function SocialAccountsPage() {
     return () => window.clearTimeout(t)
   }, [load])
 
-  const closeConnect = () => {
-    setConnectOpen(false)
-    setConnectValues({})
-    setActive(null)
-  }
-
-  const openConnect = (account) => {
-    if (!account?.id) {
-      showToast('This account has no id. Reload Social Accounts and try again.', 'error')
+  const openConnect = async (account) => {
+    if (!account?.connectUrl) {
+      showToast('This card has no server id yet. Reload Social Accounts, then connect.', 'error')
       return
     }
-    const fields = account.connectForm?.fields || []
-    setActive(account)
-    setConnectValues(initialConnectValues(fields, account))
-    setConnectOpen(true)
-  }
-
-  const submitConnect = async (event) => {
-    event.preventDefault()
-    if (!active?.id) return
+    if (account.connectForm?.credentialsConfigured === false) {
+      setMissingNotice({
+        platform: account.platform || 'This network',
+        names: account.connectForm.missingEnv?.length
+          ? account.connectForm.missingEnv
+          : ['Server keys are not set.'],
+      })
+      return
+    }
     setBusy(true)
     try {
-      await connectSocialAccount(active.id, connectValues, active.connectUrl)
-      showToast(`${active.platform || 'Account'} connected.`)
-      closeConnect()
+      await connectSocialAccount(account.id, account.connectUrl)
+      showToast(`${account.platform || 'Account'} connected.`)
       await load()
     } catch (err) {
       showToast(err.message || 'Unable to connect account.', 'error')
@@ -161,12 +140,6 @@ export default function SocialAccountsPage() {
     }
   }
 
-  const setConnectField = (name, value) => {
-    setConnectValues((current) => ({ ...current, [name]: value }))
-  }
-
-  const connectForm = active?.connectForm
-
   return (
     <div className="mx-auto w-full max-w-7xl">
       <Breadcrumbs />
@@ -199,92 +172,27 @@ export default function SocialAccountsPage() {
       )}
 
       <Modal
-        open={connectOpen && Boolean(active)}
-        onClose={closeConnect}
-        title={connectForm?.title || (active?.platform ? `Connect ${active.platform}` : 'Connect Account')}
-        className="max-w-xl"
+        open={Boolean(missingNotice)}
+        onClose={() => setMissingNotice(null)}
+        title={`${missingNotice?.platform || 'Network'} keys are missing`}
       >
-        <form className="grid gap-3" onSubmit={submitConnect}>
-          {connectForm?.clientAsk ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-              <p>{connectForm.clientAsk}</p>
-              {connectForm.helpUrl ? (
-                <a
-                  href={connectForm.helpUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-flex items-center gap-1 font-medium text-amber-900 underline"
-                >
-                  {connectForm.helpUrl}
-                  <ExternalLink size={14} />
-                </a>
-              ) : null}
-            </div>
-          ) : null}
-          {(connectForm?.fields || []).map((field) => {
-            if (field.type === 'textarea') {
-              return (
-                <div key={field.name} className="flex flex-col gap-1.5">
-                  <label htmlFor={field.name} className="text-sm font-medium">
-                    {field.label}
-                  </label>
-                  <textarea
-                    id={field.name}
-                    name={field.name}
-                    className="input-field min-h-20"
-                    value={connectValues[field.name] || ''}
-                    onChange={(event) => setConnectField(field.name, event.target.value)}
-                    required={field.required}
-                    placeholder={field.placeholder}
-                  />
-                  {field.help ? (
-                    <p className="text-xs text-[var(--text-secondary)]">{field.help}</p>
-                  ) : null}
-                </div>
-              )
-            }
-            return (
-              <div key={field.name} className="grid gap-1">
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  label={field.label}
-                  type={field.type === 'password' ? 'password' : field.type}
-                  value={connectValues[field.name] || ''}
-                  onChange={(event) => setConnectField(field.name, event.target.value)}
-                  required={field.required}
-                  placeholder={field.placeholder}
-                  autoComplete={field.type === 'password' ? 'new-password' : 'off'}
-                />
-                {field.help ? (
-                  <p className="text-xs text-[var(--text-secondary)]">{field.help}</p>
-                ) : null}
-              </div>
-            )
-          })}
-          <p className="text-xs text-[var(--text-secondary)]">
-            Enter the developer app keys from the client. Do not enter the social account password.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={closeConnect}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={busy || !(connectForm?.fields || []).length}>
-              {busy ? (
-                <>
-                  <LoadingSpinner size={16} />
-                  Connecting…
-                </>
-              ) : (
-                'Connect'
-              )}
-            </Button>
-          </div>
-        </form>
+        <p className="text-sm text-[var(--text-secondary)]">
+          Connect cannot run until these server settings are filled in and the API is restarted.
+        </p>
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm font-medium">
+          {(missingNotice?.names || []).map((name) => (
+            <li key={name}>{name}</li>
+          ))}
+        </ul>
+        <div className="mt-5 flex justify-end">
+          <Button variant="secondary" onClick={() => setMissingNotice(null)}>
+            Close
+          </Button>
+        </div>
       </Modal>
 
       <Modal
-        open={settingsOpen && Boolean(active) && !connectOpen}
+        open={settingsOpen && Boolean(active)}
         onClose={() => setSettingsOpen(false)}
         title="Social Settings"
       >

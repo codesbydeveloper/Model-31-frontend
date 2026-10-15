@@ -70,6 +70,24 @@ export default function InventoryDetailPage() {
         actions={<StatusBadge status={item.status} />}
       />
 
+      <Card className="mb-4">
+        <h2 className="mb-3 text-base font-semibold">Images</h2>
+        {(item.images || []).length === 0 ? (
+          <p className="text-sm text-[var(--text-secondary)]">No images yet.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {item.images.map((image) => (
+              <img
+                key={image.id}
+                src={image.url}
+                alt=""
+                className="h-28 w-full rounded-[var(--radius-md)] object-cover"
+              />
+            ))}
+          </div>
+        )}
+      </Card>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <h2 className="mb-3 text-base font-semibold">Vehicle Details</h2>

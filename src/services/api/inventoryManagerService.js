@@ -1,5 +1,6 @@
 import { apiRequest } from './http'
 import { extractItem, extractList, textValue } from './payload'
+import { mapVehicleImages } from '../../utils/vehicleImage'
 
 function numberValue(...values) {
   for (const value of values) {
@@ -37,6 +38,7 @@ function mapVehicle(raw, index = 0) {
     photoCount: numberValue(raw.photoCount, raw.photos),
     merchStatus: textValue(raw.merchStatus || raw.status, 'Needs Photos'),
     dealership: textValue(raw.dealership || raw.dealershipName),
+    images: mapVehicleImages(raw),
   }
 }
 
@@ -63,6 +65,55 @@ export async function getInventoryManagerInventory() {
   return extractList(payload, ['inventory', 'vehicles', 'items']).map(mapVehicle).filter(Boolean)
 }
 
+export async function createInventoryManagerVehicle(form) {
+  const images = (form.images || []).map((item) => String(item || '').trim()).filter(Boolean)
+  const payload = await apiRequest('/api/inventory-manager/inventory', {
+    method: 'POST',
+    body: {
+      vehicle: String(form.vehicle || '').trim(),
+      year: form.year ? Number(form.year) : undefined,
+      make: String(form.make || '').trim(),
+      model: String(form.model || '').trim(),
+      vin: String(form.vin || '').trim(),
+      price: form.price === '' || form.price == null ? undefined : Number(form.price),
+      images,
+    },
+  })
+  return mapVehicle(extractItem(payload, ['vehicle', 'item']))
+}
+
+export async function updateInventoryManagerVehicle(id, form) {
+  const body = new FormData()
+  const vehicle = String(form.vehicle || '').trim()
+  if (vehicle) body.append('vehicle', vehicle)
+  if (form.year) body.append('year', String(form.year))
+  body.append('make', String(form.make || '').trim())
+  body.append('model', String(form.model || '').trim())
+  body.append('vin', String(form.vin || '').trim())
+  if (form.price !== '' && form.price != null) body.append('price', String(form.price))
+  for (const file of form.images || []) {
+    if (file) body.append('images', file)
+  }
+  const payload = await apiRequest(
+    `/api/inventory-manager/inventory/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body },
+  )
+  return mapVehicle(extractItem(payload, ['vehicle', 'item']))
+}
+
+export async function deleteInventoryManagerImage(vehicleId, imageId) {
+  await apiRequest(
+    `/api/inventory-manager/inventory/${encodeURIComponent(vehicleId)}/images/${encodeURIComponent(imageId)}`,
+    { method: 'DELETE' },
+  )
+}
+
+export async function deleteInventoryManagerVehicle(id) {
+  await apiRequest(`/api/inventory-manager/inventory/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function getInventoryManagerPhotos() {
   const payload = await apiRequest('/api/inventory-manager/photos')
   return extractList(payload, ['photos', 'vehicles', 'items', 'inventory'])
@@ -80,6 +131,9 @@ export async function getInventoryManagerVehicle(id) {
 export default {
   getInventoryManagerDashboard,
   getInventoryManagerInventory,
+  updateInventoryManagerVehicle,
+  deleteInventoryManagerImage,
+  deleteInventoryManagerVehicle,
   getInventoryManagerPhotos,
   getInventoryManagerVehicle,
 }

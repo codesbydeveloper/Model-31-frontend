@@ -7,6 +7,7 @@ import {
   formatStamp,
 } from './payload'
 import { INVENTORY_STATUSES } from '../../data/inventory'
+import { mapVehicleImages } from '../../utils/vehicleImage'
 
 function numberValue(...values) {
   for (const value of values) {
@@ -86,6 +87,7 @@ export function mapInventoryVehicle(raw, index = 0) {
         id: row.id || row._id || `hist_${idx}`,
       }),
     ),
+    images: mapVehicleImages(raw),
   }
 }
 
@@ -166,6 +168,67 @@ export async function getInventory({
     items,
     ...extractPagination(payload, { page, limit, itemCount: items.length }),
   }
+}
+
+export async function createInventoryVehicle(form) {
+  const year = form.year ? Number(form.year) : undefined
+  const make = String(form.make || '').trim()
+  const model = String(form.model || '').trim()
+  const body = new FormData()
+  if (year) body.append('year', String(year))
+  body.append('make', make)
+  body.append('model', model)
+  body.append('trim', String(form.trim || '').trim())
+  body.append('vin', String(form.vin || '').trim())
+  body.append('price', form.price === '' || form.price == null ? '0' : String(form.price))
+  body.append('status', form.status || 'AVAILABLE')
+  body.append('dealership', String(form.dealership || '').trim())
+  body.append('vehicle', [year, make, model].filter(Boolean).join(' '))
+  for (const file of form.images || []) {
+    if (file) body.append('images', file)
+  }
+  const payload = await apiRequest('/api/super-admin/inventory', {
+    method: 'POST',
+    body,
+  })
+  return mapInventoryVehicle(extractItem(payload, ['vehicle', 'item']) || payload.vehicle)
+}
+
+export async function updateInventoryVehicle(id, form) {
+  const year = form.year ? Number(form.year) : undefined
+  const make = String(form.make || '').trim()
+  const model = String(form.model || '').trim()
+  const body = new FormData()
+  if (year) body.append('year', String(year))
+  body.append('make', make)
+  body.append('model', model)
+  body.append('trim', String(form.trim || '').trim())
+  body.append('vin', String(form.vin || '').trim())
+  body.append('price', form.price === '' || form.price == null ? '0' : String(form.price))
+  body.append('status', form.status || 'AVAILABLE')
+  body.append('dealership', String(form.dealership || '').trim())
+  body.append('vehicle', [year, make, model].filter(Boolean).join(' '))
+  for (const file of form.images || []) {
+    if (file) body.append('images', file)
+  }
+  const payload = await apiRequest(`/api/super-admin/inventory/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body,
+  })
+  return mapInventoryVehicle(extractItem(payload, ['vehicle', 'item']) || payload.vehicle)
+}
+
+export async function deleteInventoryImage(vehicleId, imageId) {
+  await apiRequest(
+    `/api/super-admin/inventory/${encodeURIComponent(vehicleId)}/images/${encodeURIComponent(imageId)}`,
+    { method: 'DELETE' },
+  )
+}
+
+export async function deleteInventoryVehicle(id) {
+  await apiRequest(`/api/super-admin/inventory/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
 }
 
 export async function getInventoryById(id) {

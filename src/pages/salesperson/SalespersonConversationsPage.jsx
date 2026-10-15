@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Bot, UserRound, Send } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
@@ -19,6 +19,7 @@ export default function SalespersonConversationsPage() {
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const threadRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,6 +62,12 @@ export default function SalespersonConversationsPage() {
     return () => window.clearTimeout(t)
   }, [selectedId, loadThread])
 
+  useEffect(() => {
+    const thread = threadRef.current
+    if (!thread) return
+    thread.scrollTop = thread.scrollHeight
+  }, [messages])
+
   const selected = useMemo(
     () => leads.find((item) => item.id === selectedId) || null,
     [leads, selectedId],
@@ -98,12 +105,12 @@ export default function SalespersonConversationsPage() {
         description="Continue customer conversations from your assigned leads."
       />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-1" padding={false}>
-          <div className="border-b border-[var(--border-default)] px-4 py-3 text-sm font-semibold">
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:h-[70vh] lg:grid-cols-3">
+        <Card className="flex h-[40vh] flex-col overflow-hidden lg:col-span-1 lg:h-full" padding={false}>
+          <div className="shrink-0 border-b border-[var(--border-default)] px-4 py-3 text-sm font-semibold">
             My conversations
           </div>
-          <div className="max-h-[50vh] overflow-y-auto lg:max-h-[70vh]">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {leads.map((lead) => (
               <button
                 key={lead.id}
@@ -120,8 +127,8 @@ export default function SalespersonConversationsPage() {
           </div>
         </Card>
 
-        <Card className="flex min-h-[520px] flex-col lg:col-span-2" padding={false}>
-          <div className="border-b border-[var(--border-default)] px-4 py-3">
+        <Card className="flex h-[70vh] min-h-0 flex-col overflow-hidden lg:col-span-2 lg:h-full" padding={false}>
+          <div className="shrink-0 border-b border-[var(--border-default)] px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="font-semibold">
@@ -137,7 +144,7 @@ export default function SalespersonConversationsPage() {
             </div>
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+          <div ref={threadRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {messages.map((message) => {
               const sender = String(message.sender || '').toLowerCase()
               const mine = sender !== 'customer' && sender !== 'lead'
@@ -164,7 +171,7 @@ export default function SalespersonConversationsPage() {
                       </span>
                       <span>· {message.timestamp}</span>
                     </div>
-                    <p className="text-sm">{message.text}</p>
+                    <p className="break-words text-sm">{message.text}</p>
                   </div>
                 </div>
               )
@@ -173,7 +180,7 @@ export default function SalespersonConversationsPage() {
 
           <form
             onSubmit={send}
-            className="flex gap-2 border-t border-[var(--border-default)] p-3"
+            className="flex shrink-0 gap-2 border-t border-[var(--border-default)] p-3"
           >
             <input
               className="input-field"
