@@ -4,6 +4,8 @@ import AuthLayout from '../layouts/AuthLayout'
 import ProtectedRoute from './ProtectedRoute'
 import RoleRoute from './RoleRoute'
 import Login from '../pages/auth/Login'
+import PrivacyPolicy from '../pages/PrivacyPolicy'
+import DataDeletion from '../pages/DataDeletion'
 import AccessDeniedPage from '../pages/AccessDeniedPage'
 import NotFoundPage from '../pages/NotFoundPage'
 import ProfilePage from '../pages/ProfilePage'
@@ -141,6 +143,8 @@ function RoleOutlet({ allowedRoles }) {
 export default function AppRoutes() {
   return (
     <Routes>
+      <Route path="privacy-policy" element={<PrivacyPolicy />} />
+      <Route path="data-deletion" element={<DataDeletion />} />
       <Route element={<AuthLayout />}>
         <Route path="login" element={<Login />} />
         <Route path="script-approve/:token" element={<ScriptApprovePage />} />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
@@ -165,6 +165,18 @@ export default function Login() {
           >
             {isSubmitting ? 'Signing in...' : 'Sign In'}
           </Button>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Link to="/privacy-policy">
+              <Button type="button" variant="secondary" className="w-full">
+                Privacy Policy
+              </Button>
+            </Link>
+            <Link to="/data-deletion">
+              <Button type="button" variant="secondary" className="w-full">
+                Data Deletion
+              </Button>
+            </Link>
+          </div>
         </form>
       </Card>
 
