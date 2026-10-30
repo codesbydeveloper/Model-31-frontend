@@ -364,7 +364,7 @@ export const ROLE_NAVIGATION = {
       icon: Settings,
       title: 'Settings',
       subtitle: 'Dealership Settings',
-      description: 'Configure dealership preferences.',
+      description: 'Configure preferences and the dealership text account.',
       isSettings: true,
     },
   ],

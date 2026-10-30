@@ -159,7 +159,7 @@ export default function DealershipConversationsPage() {
               <Select
                 value={senderType}
                 onChange={(e) => setSenderType(e.target.value)}
-                options={['AI', 'AGENT', 'CUSTOMER']}
+                options={['AI', 'STAFF', 'CUSTOMER']}
               />
               <Input
                 value={draft}
