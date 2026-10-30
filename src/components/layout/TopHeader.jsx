@@ -26,6 +26,7 @@ export default function TopHeader({ onMenuClick }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const menuRef = useRef(null)
   const notifRef = useRef(null)
   const pageTitle = getPageTitle(location.pathname, user?.role)
@@ -43,14 +44,20 @@ export default function TopHeader({ onMenuClick }) {
   useEffect(() => {
     if (token === 'demo-token') {
       setNotifications([])
+      setUnreadCount(0)
       return undefined
     }
     const t = window.setTimeout(async () => {
       try {
-        const rows = await notificationService.getNotifications()
-        setNotifications(rows.filter((n) => !n.read).slice(0, 5))
+        const [rows, count] = await Promise.all([
+          notificationService.getNotifications({ unread: true, limit: 5 }),
+          notificationService.getUnreadNotificationCount(),
+        ])
+        setNotifications(rows)
+        setUnreadCount(count)
       } catch {
         setNotifications([])
+        setUnreadCount(0)
       }
     }, 0)
     return () => window.clearTimeout(t)
@@ -62,7 +69,7 @@ export default function TopHeader({ onMenuClick }) {
     navigate('/login', { replace: true })
   }
 
-  const unread = notifications.filter((n) => !n.read).length
+  const unread = unreadCount
 
   const notificationsPath =
     user?.role === ROLES.SUPER_ADMIN

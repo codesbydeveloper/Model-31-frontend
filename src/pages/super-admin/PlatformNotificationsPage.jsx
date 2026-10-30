@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
@@ -10,23 +11,42 @@ import { useToast } from '../../hooks/useToast'
 import notificationService from '../../services/api/notificationService'
 import { Link } from 'react-router-dom'
 
+const PAGE_SIZE = 10
+
+function visiblePages(current, total) {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, index) => index + 1)
+  }
+  const start = Math.max(1, Math.min(current - 2, total - 4))
+  const end = Math.min(total, start + 4)
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index)
+}
+
 export default function PlatformNotificationsPage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [category, setCategory] = useState('all')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await notificationService.getNotifications())
+      const result = await notificationService.getNotificationPage({ page, limit: PAGE_SIZE })
+      setRows(result.items)
+      setTotal(result.total)
+      setUnreadCount(result.unreadCount)
     } catch (err) {
       setRows([])
+      setTotal(0)
+      setUnreadCount(0)
       showToast(err.message || 'Unable to load notifications.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [page, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -43,14 +63,17 @@ export default function PlatformNotificationsPage() {
     return rows.filter((r) => r.category === category)
   }, [rows, category])
 
-  const unread = rows.filter((r) => !r.read).length
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const from = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const to = rows.length === 0 ? 0 : from + rows.length - 1
 
   return (
     <div className="mx-auto w-full max-w-4xl">
       <Breadcrumbs />
       <PageHeader
         title="Platform Notifications"
-        description={`${unread} unread system alerts across CRM, AI, dispatch and social.`}
+        description={`${unreadCount} unread system alerts across CRM, AI, dispatch and social.`}
         actions={
           <Button
             variant="secondary"
@@ -151,6 +174,47 @@ export default function PlatformNotificationsPage() {
               </li>
             ))}
           </ul>
+        )}
+        {!loading && (
+          <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border-default)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-[var(--text-secondary)]">
+              Showing {from}–{to} of {total}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={currentPage <= 1}
+                onClick={() => setPage(currentPage - 1)}
+                aria-label="Previous page"
+              >
+                <ChevronLeft size={16} />
+                Previous
+              </Button>
+              {visiblePages(currentPage, totalPages).map((pageNumber) => (
+                <Button
+                  key={pageNumber}
+                  variant={pageNumber === currentPage ? 'primary' : 'secondary'}
+                  size="sm"
+                  onClick={() => setPage(pageNumber)}
+                  aria-current={pageNumber === currentPage ? 'page' : undefined}
+                  aria-label={`Page ${pageNumber}`}
+                >
+                  {pageNumber}
+                </Button>
+              ))}
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage(currentPage + 1)}
+                aria-label="Next page"
+              >
+                Next
+                <ChevronRight size={16} />
+              </Button>
+            </div>
+          </div>
         )}
       </Card>
     </div>

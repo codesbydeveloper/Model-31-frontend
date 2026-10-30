@@ -1,20 +1,20 @@
 import { apiRequest } from './http'
-import { extractItem, extractList, textValue, formatStamp } from './payload'
+import { extractItem, extractList, extractPagination, textValue, formatStamp } from './payload'
 
-function numberValue(...values) {
-  for (const value of values) {
-    if (value == null || value === '') continue
-    const num = Number(value)
-    if (Number.isFinite(num)) return num
-  }
-  return 0
+function labelFromType(type) {
+  return String(type || '')
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
 }
 
 export function mapNotification(raw) {
   if (!raw || typeof raw !== 'object') return null
   return {
     id: raw.id || raw._id,
-    category: textValue(raw.category) || 'System Alerts',
+    category: textValue(raw.category) || labelFromType(raw.type) || 'Notification',
     title: textValue(raw.title),
     description: textValue(raw.description || raw.message || raw.body),
     severity: textValue(raw.severity || raw.level) || 'INFO',
@@ -29,9 +29,42 @@ export function mapNotification(raw) {
   }
 }
 
-export async function getNotifications() {
-  const payload = await apiRequest('/api/notifications')
-  return extractList(payload, ['notifications', 'items']).map(mapNotification).filter(Boolean)
+async function requestNotifications({ unread = false, limit, page } = {}) {
+  const search = new URLSearchParams()
+  if (unread) search.set('unread', 'true')
+  if (limit) search.set('limit', String(limit))
+  if (page) search.set('page', String(page))
+  const query = search.toString()
+  const payload = await apiRequest(`/api/notifications${query ? `?${query}` : ''}`)
+  const items = extractList(payload, ['notifications', 'items']).map(mapNotification).filter(Boolean)
+  const pagination = extractPagination(payload, {
+    page: page || 1,
+    limit: limit || items.length || 20,
+    itemCount: items.length,
+  })
+  const data = payload?.data && typeof payload.data === 'object' ? payload.data : payload
+  const unreadCount = Number(data?.unreadCount)
+  return {
+    items,
+    ...pagination,
+    unreadCount: Number.isFinite(unreadCount) ? unreadCount : items.filter((item) => !item.read).length,
+  }
+}
+
+export async function getNotifications(params = {}) {
+  const result = await requestNotifications(params)
+  return result.items
+}
+
+export async function getNotificationPage(params = {}) {
+  return requestNotifications(params)
+}
+
+export async function getUnreadNotificationCount() {
+  const payload = await apiRequest('/api/notifications/unread-count')
+  const data = payload?.data && typeof payload.data === 'object' ? payload.data : payload
+  const count = Number(data?.unreadCount)
+  return Number.isFinite(count) ? count : 0
 }
 
 export async function markNotificationRead(id) {
@@ -42,7 +75,7 @@ export async function markNotificationRead(id) {
 }
 
 export async function markAllNotificationsRead() {
-  await apiRequest('/api/notifications/read-all', { method: 'PATCH' })
+  await apiRequest('/api/notifications/read-all', { method: 'POST' })
   return true
 }
 
@@ -53,6 +86,8 @@ export async function dismissNotification(id) {
 
 const notificationService = {
   getNotifications,
+  getNotificationPage,
+  getUnreadNotificationCount,
   markNotificationRead,
   markAllNotificationsRead,
   dismissNotification,
