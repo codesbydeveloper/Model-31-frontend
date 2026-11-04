@@ -98,6 +98,10 @@ export default function InventoryDetailPage() {
             <Row label="Model" value={item.model} />
             <Row label="Trim" value={item.trim} />
             <Row label="Price" value={`$${formatNumber(item.price)}`} />
+            <Row
+              label="Min price"
+              value={item.minPrice == null ? '—' : `$${formatNumber(item.minPrice)}`}
+            />
             <Row label="Mileage" value={`${formatNumber(item.mileage)} mi`} />
             <Row label="Color" value={item.color} />
             <Row label="Dealership" value={item.dealership} />

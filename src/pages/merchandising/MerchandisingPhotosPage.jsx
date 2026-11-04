@@ -60,6 +60,11 @@ export default function MerchandisingPhotosPage() {
                 label: 'Price',
                 render: (row) => formatMoney(row.price),
               },
+              {
+                key: 'minPrice',
+                label: 'Min Price',
+                render: (row) => (row.minPrice == null ? '—' : formatMoney(row.minPrice)),
+              },
               { key: 'daysInStock', label: 'Days' },
               {
                 key: 'merchStatus',

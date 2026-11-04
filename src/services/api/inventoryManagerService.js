@@ -34,6 +34,7 @@ function mapVehicle(raw, index = 0) {
     model,
     vehicle: textValue(raw.vehicle) || [year, make, model].filter(Boolean).join(' '),
     price: numberValue(raw.price),
+    minPrice: raw.minPrice == null || raw.minPrice === '' ? null : numberValue(raw.minPrice),
     daysInStock: numberValue(raw.daysInStock, raw.days),
     photoCount: numberValue(raw.photoCount, raw.photos),
     merchStatus: textValue(raw.merchStatus || raw.status, 'Needs Photos'),
@@ -76,6 +77,7 @@ export async function createInventoryManagerVehicle(form) {
       model: String(form.model || '').trim(),
       vin: String(form.vin || '').trim(),
       price: form.price === '' || form.price == null ? undefined : Number(form.price),
+      minPrice: form.minPrice === '' || form.minPrice == null ? null : Number(form.minPrice),
       images,
     },
   })
@@ -91,6 +93,7 @@ export async function updateInventoryManagerVehicle(id, form) {
   body.append('model', String(form.model || '').trim())
   body.append('vin', String(form.vin || '').trim())
   if (form.price !== '' && form.price != null) body.append('price', String(form.price))
+  body.append('minPrice', form.minPrice === '' || form.minPrice == null ? '' : String(form.minPrice))
   for (const file of form.images || []) {
     if (file) body.append('images', file)
   }

@@ -33,6 +33,7 @@ const EMPTY_ADD_FORM = {
   trim: '',
   vin: '',
   price: '',
+  minPrice: '',
   status: 'AVAILABLE',
   dealership: '',
 }
@@ -272,6 +273,7 @@ export default function InventoryPage() {
       trim: cleanField(row.trim),
       vin: cleanField(row.vin),
       price: row.price == null ? '' : String(row.price),
+      minPrice: row.minPrice == null ? '' : String(row.minPrice),
       status: STATUS_FOR_FORM[String(row.status || '').toUpperCase()] || 'AVAILABLE',
       dealership: cleanField(row.dealership),
     })
@@ -443,6 +445,11 @@ export default function InventoryPage() {
                 render: (row) => `$${formatNumber(row.price)}`,
               },
               {
+                key: 'minPrice',
+                label: 'Min Price',
+                render: (row) => (row.minPrice == null ? '—' : `$${formatNumber(row.minPrice)}`),
+              },
+              {
                 key: 'status',
                 label: 'Status',
                 render: (row) => <StatusBadge status={row.status} />,
@@ -487,7 +494,6 @@ export default function InventoryPage() {
             <Input label="Year" value={form.year} onChange={setField('year')} inputMode="numeric" />
             <Input label="Trim" value={form.trim} onChange={setField('trim')} />
             <Input label="VIN" value={form.vin} onChange={setField('vin')} />
-            <Input label="Price" value={form.price} onChange={setField('price')} inputMode="decimal" />
             <Select
               label="Dealership"
               value={form.dealership}
@@ -495,6 +501,8 @@ export default function InventoryPage() {
               placeholder="Select dealership"
               options={dealershipChoices}
             />
+            <Input label="Price" value={form.price} onChange={setField('price')} inputMode="decimal" />
+            <Input label="Min price" value={form.minPrice} onChange={setField('minPrice')} inputMode="decimal" />
             <Select
               label="Status"
               value={form.status}
@@ -563,7 +571,6 @@ export default function InventoryPage() {
             <Input label="Year" value={editForm.year} onChange={setEditField('year')} inputMode="numeric" />
             <Input label="Trim" value={editForm.trim} onChange={setEditField('trim')} />
             <Input label="VIN" value={editForm.vin} onChange={setEditField('vin')} />
-            <Input label="Price" value={editForm.price} onChange={setEditField('price')} inputMode="decimal" />
             <Select
               label="Dealership"
               value={editForm.dealership}
@@ -571,6 +578,8 @@ export default function InventoryPage() {
               placeholder="Select dealership"
               options={dealershipChoices}
             />
+            <Input label="Price" value={editForm.price} onChange={setEditField('price')} inputMode="decimal" />
+            <Input label="Min price" value={editForm.minPrice} onChange={setEditField('minPrice')} inputMode="decimal" />
             <Select
               label="Status"
               value={editForm.status}

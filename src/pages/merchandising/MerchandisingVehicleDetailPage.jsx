@@ -106,6 +106,7 @@ export default function MerchandisingVehicleDetailPage() {
           <Row label="Make" value={item.make} />
           <Row label="Model" value={item.model} />
           <Row label="Price" value={formatMoney(item.price)} />
+          <Row label="Min price" value={item.minPrice == null ? '—' : formatMoney(item.minPrice)} />
           <Row label="Days in stock" value={item.daysInStock} />
           <Row label="Photos" value={item.photoCount} />
           <Row label="Merch status" value={item.merchStatus} />

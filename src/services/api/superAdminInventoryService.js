@@ -62,6 +62,8 @@ export function mapInventoryVehicle(raw, index = 0) {
     model: model || '—',
     trim: textValue(raw.trim, '—'),
     price: numberValue(raw.price, raw.currentPrice),
+    minPrice:
+      raw.minPrice == null || raw.minPrice === '' ? null : numberValue(raw.minPrice),
     originalPrice: numberValue(raw.originalPrice, raw.msrp, raw.price),
     previousPrice: numberValue(raw.previousPrice),
     priceChangeDate: formatDate(raw.priceChangeDate || raw.priceChangedAt) || null,
@@ -181,6 +183,7 @@ export async function createInventoryVehicle(form) {
   body.append('trim', String(form.trim || '').trim())
   body.append('vin', String(form.vin || '').trim())
   body.append('price', form.price === '' || form.price == null ? '0' : String(form.price))
+  body.append('minPrice', form.minPrice === '' || form.minPrice == null ? '' : String(form.minPrice))
   body.append('status', form.status || 'AVAILABLE')
   body.append('dealership', String(form.dealership || '').trim())
   body.append('vehicle', [year, make, model].filter(Boolean).join(' '))
@@ -205,6 +208,7 @@ export async function updateInventoryVehicle(id, form) {
   body.append('trim', String(form.trim || '').trim())
   body.append('vin', String(form.vin || '').trim())
   body.append('price', form.price === '' || form.price == null ? '0' : String(form.price))
+  body.append('minPrice', form.minPrice === '' || form.minPrice == null ? '' : String(form.minPrice))
   body.append('status', form.status || 'AVAILABLE')
   body.append('dealership', String(form.dealership || '').trim())
   body.append('vehicle', [year, make, model].filter(Boolean).join(' '))

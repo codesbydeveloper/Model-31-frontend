@@ -27,6 +27,7 @@ const EMPTY_FORM = {
   model: '',
   vin: '',
   price: '',
+  minPrice: '',
   images: [''],
 }
 
@@ -114,6 +115,7 @@ export default function MerchandisingInventoryPage() {
       model: row.model || '',
       vin: row.vin || '',
       price: row.price == null ? '' : String(row.price),
+      minPrice: row.minPrice == null ? '' : String(row.minPrice),
       images: [''],
     })
     setEditOpen(true)
@@ -250,6 +252,11 @@ export default function MerchandisingInventoryPage() {
                 label: 'Price',
                 render: (row) => formatMoney(row.price),
               },
+              {
+                key: 'minPrice',
+                label: 'Min Price',
+                render: (row) => (row.minPrice == null ? '—' : formatMoney(row.minPrice)),
+              },
               { key: 'daysInStock', label: 'Days' },
               { key: 'photoCount', label: 'Photos' },
               {
@@ -290,6 +297,7 @@ export default function MerchandisingInventoryPage() {
             <Input label="Model" value={form.model} onChange={setField('model')} />
             <Input label="VIN" value={form.vin} onChange={setField('vin')} />
             <Input label="Price" value={form.price} onChange={setField('price')} inputMode="decimal" />
+            <Input label="Min price" value={form.minPrice} onChange={setField('minPrice')} inputMode="decimal" />
           </div>
           <div className="grid gap-2">
             <p className="text-sm font-medium">Images</p>
@@ -347,6 +355,7 @@ export default function MerchandisingInventoryPage() {
             <Input label="Model" value={editForm.model} onChange={setEditField('model')} />
             <Input label="VIN" value={editForm.vin} onChange={setEditField('vin')} />
             <Input label="Price" value={editForm.price} onChange={setEditField('price')} inputMode="decimal" />
+            <Input label="Min price" value={editForm.minPrice} onChange={setEditField('minPrice')} inputMode="decimal" />
           </div>
           <div className="grid gap-2">
             <p className="text-sm font-medium">Images</p>
