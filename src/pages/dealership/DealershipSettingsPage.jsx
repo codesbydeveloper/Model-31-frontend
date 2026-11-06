@@ -42,6 +42,7 @@ const TIMEZONES = [
   { value: 'America/St_Johns', label: 'Newfoundland' },
   { value: 'America/Anchorage', label: 'Alaska' },
   { value: 'Pacific/Honolulu', label: 'Hawaii' },
+  { value: 'Asia/Kolkata', label: 'India — Kolkata' },
 ]
 
 const PROFILE_PROVIDERS = new Set(['Sinch', 'Bandwidth'])
