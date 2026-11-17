@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
@@ -109,6 +109,7 @@ export default function DealershipSocialPage() {
   const [smsSaving, setSmsSaving] = useState(false)
   const [smsDeleteOpen, setSmsDeleteOpen] = useState(false)
   const [smsForm, setSmsForm] = useState(null)
+  const [showSecret, setShowSecret] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -169,6 +170,7 @@ export default function DealershipSocialPage() {
   const openSmsEdit = async () => {
     setSmsEditOpen(true)
     setSmsEditLoading(true)
+    setShowSecret(false)
     setSmsForm(null)
     try {
       const saved = await dealershipSettingsService.getDealershipSmsAccount()
@@ -335,14 +337,24 @@ export default function DealershipSocialPage() {
               autoComplete="off"
               onChange={(event) => setSmsForm((current) => ({ ...current, accountSid: event.target.value }))}
             />
-            <Input
-              label="Secret key"
-              type="password"
-              value={smsForm.authToken}
-              autoComplete="new-password"
-              placeholder={smsForm.hasAuthToken ? 'Leave blank to keep the saved secret' : 'The secret key from the text company'}
-              onChange={(event) => setSmsForm((current) => ({ ...current, authToken: event.target.value }))}
-            />
+            <div>
+              <Input
+                label="Secret key"
+                type={showSecret ? 'text' : 'password'}
+                value={smsForm.authToken}
+                autoComplete="new-password"
+                placeholder={smsForm.hasAuthToken ? 'Leave blank to keep the saved secret' : 'The secret key from the text company'}
+                onChange={(event) => setSmsForm((current) => ({ ...current, authToken: event.target.value }))}
+              />
+              <button
+                type="button"
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--brand-accent)] hover:underline"
+                onClick={() => setShowSecret((value) => !value)}
+              >
+                {showSecret ? <EyeOff size={14} /> : <Eye size={14} />}
+                {showSecret ? 'Hide secret key' : 'Show secret key'}
+              </button>
+            </div>
             {['Sinch', 'Bandwidth'].includes(smsForm.providerType) && (
               <Input
                 label="Extra ID"
