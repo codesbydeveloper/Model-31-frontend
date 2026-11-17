@@ -4,7 +4,7 @@ import Button from '../common/Button'
 import { formatNumber, formatPercent } from '../../utils/table'
 import PlatformBadge from './PlatformBadge'
 
-export default function SocialPlatformCard({ account, onConnect, onDisconnect, onSettings }) {
+export default function SocialPlatformCard({ account, onConnect, onDisconnect, onSettings, busy = false }) {
   const disconnected = String(account.status || '').toUpperCase() !== 'CONNECTED'
   const canConnect = account.canConnect ?? disconnected
   const canDisconnect = account.canDisconnect ?? !disconnected
@@ -56,17 +56,17 @@ export default function SocialPlatformCard({ account, onConnect, onDisconnect, o
       </dl>
       <div className="mt-4 flex flex-wrap gap-2">
         {canConnect && (
-          <Button size="sm" onClick={() => onConnect?.(account)}>
+          <Button size="sm" disabled={busy} onClick={() => onConnect?.(account)}>
             Connect
           </Button>
         )}
         {canSettings && (
-          <Button size="sm" variant="secondary" onClick={() => onSettings?.(account)}>
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => onSettings?.(account)}>
             Settings
           </Button>
         )}
         {canDisconnect && (
-          <Button size="sm" variant="ghost" onClick={() => onDisconnect?.(account)}>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => onDisconnect?.(account)}>
             Disconnect
           </Button>
         )}

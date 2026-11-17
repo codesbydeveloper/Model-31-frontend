@@ -21,6 +21,8 @@ function sourceLabel(value) {
   return sourceOn(value) ? 'ON' : 'OFF'
 }
 
+const PLATFORM_SLUGS = ['facebook', 'instagram', 'whatsapp', 'tiktok', 'youtube', 'x']
+
 export function mapSocialPlatform(raw, index = 0) {
   if (!raw || typeof raw !== 'object') return null
   const name = textValue(raw.name || raw.platform, 'Platform')
@@ -85,7 +87,9 @@ export async function getSocialIntegrations() {
   const staff = payload.staffAccounts || payload.staff || {}
   return {
     pageTitle: textValue(payload.pageTitle, 'Social Integrations'),
-    platforms: extractList(payload, ['platforms', 'items']).map(mapSocialPlatform).filter(Boolean),
+    platforms: extractList(payload, ['platforms', 'items'])
+      .map(mapSocialPlatform)
+      .filter((item) => item && PLATFORM_SLUGS.includes(item.slug)),
     staffTitle: textValue(staff.title, 'Authorized Staff Social Accounts'),
     staffDescription: textValue(
       staff.description,

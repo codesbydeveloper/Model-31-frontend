@@ -9,6 +9,7 @@ const COLORS = {
   X: 'bg-black/10 text-black',
   Whatnot: 'bg-[#7c3aed]/15 text-[#6d28d9]',
   WhatsApp: 'bg-[#25d366]/15 text-[#128c7e]',
+  SMS: 'bg-[#0f766e]/15 text-[#0f766e]',
 }
 
 export default function PlatformBadge({ platform, className = '' }) {

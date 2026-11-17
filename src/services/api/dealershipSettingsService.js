@@ -104,11 +104,29 @@ export async function updateDealershipSmsAccount(form) {
   return mapSmsAccount(payload)
 }
 
+export async function connectDealershipSmsAccount() {
+  const payload = await apiRequest('/api/dealership/sms-account/connect', { method: 'POST' })
+  return textValue(payload?.message) || 'Text account connected.'
+}
+
+export async function disconnectDealershipSmsAccount() {
+  const payload = await apiRequest('/api/dealership/sms-account/disconnect', { method: 'POST' })
+  return textValue(payload?.message) || 'Text account disconnected.'
+}
+
+export async function deleteDealershipSmsAccount() {
+  const payload = await apiRequest('/api/dealership/sms-account', { method: 'DELETE' })
+  return textValue(payload?.message) || 'Text account deleted.'
+}
+
 const dealershipSettingsService = {
   getDealershipSettings,
   updateDealershipSettings,
   getDealershipSmsAccount,
   updateDealershipSmsAccount,
+  connectDealershipSmsAccount,
+  disconnectDealershipSmsAccount,
+  deleteDealershipSmsAccount,
 }
 
 export default dealershipSettingsService

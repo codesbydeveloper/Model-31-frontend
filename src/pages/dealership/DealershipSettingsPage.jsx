@@ -112,7 +112,16 @@ export default function DealershipSettingsPage() {
     }
 
     if (smsResult.status === 'fulfilled' && smsResult.value) {
-      setSms({ ...EMPTY_SMS, ...smsResult.value, authToken: '' })
+      const loaded = smsResult.value
+      const hideDetails = Boolean(loaded.connected)
+      setSms({
+        ...EMPTY_SMS,
+        ...loaded,
+        authToken: '',
+        accountSid: hideDetails ? '' : loaded.accountSid,
+        phoneNumber: hideDetails ? '' : loaded.phoneNumber,
+        carrierProfileId: hideDetails ? '' : loaded.carrierProfileId || '',
+      })
     } else if (smsResult.status === 'rejected' && settingsResult.status === 'fulfilled') {
       showToast(smsResult.reason?.message || 'Unable to load text message settings.', 'error')
     }
@@ -162,8 +171,14 @@ export default function DealershipSettingsPage() {
       })
       setSms({
         ...EMPTY_SMS,
-        ...saved,
+        providerType: saved.providerType || sms.providerType,
+        timezone: saved.timezone || sms.timezone,
+        hasAuthToken: true,
+        connected: true,
         authToken: '',
+        accountSid: '',
+        phoneNumber: '',
+        carrierProfileId: '',
       })
       setShowSecret(false)
       showToast('Text message account saved.')
@@ -208,7 +223,7 @@ export default function DealershipSettingsPage() {
         </div>
       </Card>
 
-      <Card className="mt-4 space-y-4">
+      <Card id="text-messages" className="mt-4 space-y-4">
         <div>
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-[var(--text-primary)]">Text messages</h2>

@@ -95,12 +95,14 @@ export default function IntegrationHealthPage() {
                   <dt className="text-[var(--text-muted)]">Last Check</dt>
                   <dd className="font-medium">{item.lastCheck}</dd>
                 </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-[var(--text-muted)]">Latency</dt>
-                  <dd className="font-medium">
-                    {item.latencyMs == null ? '—' : `${item.latencyMs} ms`}
-                  </dd>
-                </div>
+                {String(item.name || '').toLowerCase() === 'openai' ? null : (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-[var(--text-muted)]">Dealership</dt>
+                    <dd className="text-right font-medium">
+                      {item.dealerships?.length ? item.dealerships.join(', ') : '—'}
+                    </dd>
+                  </div>
+                )}
                 <div className="flex justify-between gap-2">
                   <dt className="text-[var(--text-muted)]">Errors</dt>
                   <dd className="font-medium">{formatNumber(item.errors)}</dd>

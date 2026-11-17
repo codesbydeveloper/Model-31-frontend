@@ -43,6 +43,9 @@ export function mapHealthIntegration(raw, index = 0) {
     status,
     lastCheck: lastCheckLabel(raw.lastCheck || raw.lastCheckedAt || raw.checkedAt),
     latencyMs: status === 'DISCONNECTED' ? null : ms,
+    dealerships: extractList(raw, ['connectedDealerships', 'dealerships'])
+      .map((item) => textValue(item?.name || item?.dealershipName || item))
+      .filter(Boolean),
     errors: numberValue(raw.errors, raw.errorCount),
   }
 }
