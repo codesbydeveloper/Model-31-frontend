@@ -1,5 +1,5 @@
 import { apiRequest } from './http'
-import { extractItem, extractList, textValue } from './payload'
+import { extractItem, extractList, extractPagination, textValue } from './payload'
 import { mapVehicleImages } from '../../utils/vehicleImage'
 
 function numberValue(...values) {
@@ -64,6 +64,19 @@ export async function getInventoryManagerDashboard() {
 export async function getInventoryManagerInventory() {
   const payload = await apiRequest('/api/inventory-manager/inventory')
   return extractList(payload, ['inventory', 'vehicles', 'items']).map(mapVehicle).filter(Boolean)
+}
+
+export async function getInventoryManagerInventoryPage({ page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  })
+  const payload = await apiRequest(`/api/inventory-manager/inventory?${params.toString()}`)
+  const items = extractList(payload, ['inventory', 'vehicles', 'items']).map(mapVehicle).filter(Boolean)
+  return {
+    items,
+    ...extractPagination(payload, { page, limit, itemCount: items.length }),
+  }
 }
 
 export async function createInventoryManagerVehicle(form) {

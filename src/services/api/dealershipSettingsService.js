@@ -63,6 +63,9 @@ function mapSmsAccount(raw) {
     providerType: textValue(source.providerType || source.provider_type) || 'Twilio',
     accountSid: textValue(source.accountSid || source.account_sid || source.twilio_account_sid),
     phoneNumber: textValue(source.phoneNumber || source.phone_number || source.twilio_phone_number),
+    managerMobile: textValue(
+      source.managerMobile || source.manager_mobile || source.sales_alert_phones,
+    ),
     timezone: textValue(source.timezone || source.dealership_timezone) || 'America/New_York',
     carrierProfileId: textValue(source.carrierProfileId || source.carrier_profile_id),
     hasAuthToken,
@@ -93,6 +96,9 @@ export async function updateDealershipSmsAccount(form) {
     phoneNumber: textValue(form.phoneNumber),
     timezone: form.timezone,
     carrierProfileId: textValue(form.carrierProfileId) || null,
+  }
+  if (form.managerMobile != null) {
+    body.managerMobile = textValue(form.managerMobile).replace(/\s/g, '')
   }
   const authToken = textValue(form.authToken)
   if (authToken) body.authToken = authToken

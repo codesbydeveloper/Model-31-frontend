@@ -179,6 +179,7 @@ export default function DealershipSocialPage() {
         accountSid: saved?.accountSid || '',
         authToken: '',
         phoneNumber: saved?.phoneNumber || '',
+        managerMobile: saved?.managerMobile || '',
         timezone: saved?.timezone || 'America/New_York',
         carrierProfileId: saved?.carrierProfileId || '',
         hasAuthToken: Boolean(saved?.hasAuthToken),
@@ -196,9 +197,15 @@ export default function DealershipSocialPage() {
     if (!smsForm) return
     setSmsSaving(true)
     try {
+      const managerMobile = smsForm.managerMobile.replace(/\s/g, '')
+      if (!/^\+[1-9]\d{7,14}$/.test(managerMobile)) {
+        showToast('Enter the manager’s personal cell phone, like +13059998888.', 'error')
+        return
+      }
       await dealershipSettingsService.updateDealershipSmsAccount({
         ...smsForm,
         phoneNumber: smsForm.phoneNumber.replace(/\s/g, ''),
+        managerMobile,
         carrierProfileId: ['Sinch', 'Bandwidth'].includes(smsForm.providerType)
           ? smsForm.carrierProfileId
           : '',
@@ -369,6 +376,18 @@ export default function DealershipSocialPage() {
               autoComplete="off"
               onChange={(event) => setSmsForm((current) => ({ ...current, phoneNumber: event.target.value }))}
             />
+            <div>
+              <Input
+                label="Manager’s mobile"
+                value={smsForm.managerMobile}
+                placeholder="+13059998888"
+                autoComplete="off"
+                onChange={(event) => setSmsForm((current) => ({ ...current, managerMobile: event.target.value }))}
+              />
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                Enter the BDC Manager or Sales Manager’s personal cell phone (do not enter a dealership landline).
+              </p>
+            </div>
             <Select
               label="Dealership timezone"
               value={smsForm.timezone}

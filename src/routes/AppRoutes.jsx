@@ -47,6 +47,7 @@ import TrustPortalPage from '../pages/trust/TrustPortalPage'
 import TrustInvoicePage from '../pages/trust/TrustInvoicePage'
 import DealershipDashboard from '../pages/dealership/DealershipDashboard'
 import DealershipCrmPage from '../pages/dealership/DealershipCrmPage'
+import DealershipInventoryPage from '../pages/dealership/DealershipInventoryPage'
 import DealershipSocialPage from '../pages/dealership/DealershipSocialPage'
 import DealershipLeadsPage from '../pages/dealership/DealershipLeadsPage'
 import DealershipConversationsPage from '../pages/dealership/DealershipConversationsPage'
@@ -293,6 +294,7 @@ export default function AppRoutes() {
           />
           <Route path="dealership/social" element={<DealershipSocialPage />} />
           <Route path="dealership/crm" element={<DealershipCrmPage />} />
+          <Route path="dealership/inventory" element={<DealershipInventoryPage />} />
           <Route path="dealership/content" element={<DealershipContentPage />} />
           <Route path="dealership/reports" element={<DealershipReportsPage />} />
           <Route

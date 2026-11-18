@@ -52,6 +52,7 @@ const EMPTY_SMS = {
   accountSid: '',
   authToken: '',
   phoneNumber: '',
+  managerMobile: '',
   timezone: 'America/New_York',
   carrierProfileId: '',
   hasAuthToken: false,
@@ -74,6 +75,12 @@ function validateSms(form) {
     errors.phoneNumber = 'Enter the phone number customers will text.'
   } else if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
     errors.phoneNumber = 'Start with + and the country code, like +13051112222.'
+  }
+  const managerMobile = form.managerMobile.replace(/\s/g, '')
+  if (!managerMobile) {
+    errors.managerMobile = 'Enter the manager’s personal cell phone.'
+  } else if (!/^\+[1-9]\d{7,14}$/.test(managerMobile)) {
+    errors.managerMobile = 'Start with + and the country code, like +13059998888.'
   }
   if (!form.timezone) errors.timezone = 'Choose the dealership timezone.'
   if (needsProfileId(form.providerType) && !form.carrierProfileId.trim()) {
@@ -167,12 +174,14 @@ export default function DealershipSettingsPage() {
       const saved = await dealershipSettingsService.updateDealershipSmsAccount({
         ...sms,
         phoneNumber: sms.phoneNumber.replace(/\s/g, ''),
+        managerMobile: sms.managerMobile.replace(/\s/g, ''),
         carrierProfileId: needsProfileId(sms.providerType) ? sms.carrierProfileId : '',
       })
       setSms({
         ...EMPTY_SMS,
         providerType: saved.providerType || sms.providerType,
         timezone: saved.timezone || sms.timezone,
+        managerMobile: saved.managerMobile || sms.managerMobile.replace(/\s/g, ''),
         hasAuthToken: true,
         connected: true,
         authToken: '',
@@ -301,6 +310,20 @@ export default function DealershipSettingsPage() {
               autoComplete="off"
               onChange={(event) => updateSms({ phoneNumber: event.target.value })}
             />
+            <div>
+              <Input
+                label="Manager’s mobile"
+                name="managerMobile"
+                value={sms.managerMobile}
+                error={smsErrors.managerMobile}
+                placeholder="+13059998888"
+                autoComplete="off"
+                onChange={(event) => updateSms({ managerMobile: event.target.value })}
+              />
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                Enter the BDC Manager or Sales Manager’s personal cell phone (do not enter a dealership landline).
+              </p>
+            </div>
             <Select
               label="Dealership timezone"
               name="timezone"
