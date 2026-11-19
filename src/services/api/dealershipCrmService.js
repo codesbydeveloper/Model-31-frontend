@@ -1,5 +1,7 @@
-import { apiRequest } from './http'
-import { extractItem, extractList, textValue, formatStamp } from './payload'
+import { API_BASE_URL } from '../../config/api'
+import { withLoading } from '../../context/loadingStore'
+import { apiRequest, ApiError, getAuthToken } from './http'
+import { extractItem, extractList, extractPagination, textValue, formatStamp } from './payload'
 
 function mapCrm(raw) {
   if (!raw || typeof raw !== 'object') return null
@@ -33,9 +35,116 @@ export async function syncDealershipCrm() {
   return mapCrm(extractItem(payload, ['crm'])) || true
 }
 
+function mapBdcLead(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const status = textValue(raw.status) || 'NEW'
+  const sold = status.toUpperCase() === 'CLOSED'
+  return {
+    id: raw.id || raw._id,
+    name: textValue(raw.customerName || raw.name),
+    phone: textValue(raw.customerPhone || raw.phone),
+    vehicle: textValue(raw.vehicleInterest || raw.vehicle),
+    tradeIn: textValue(raw.tradeIn || raw.trade_in) || '—',
+    status,
+    canMarkSold: raw.canMarkSold === undefined ? !sold : Boolean(raw.canMarkSold),
+  }
+}
+
+export async function getBdcLeads({ page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  })
+  const payload = await apiRequest(`/api/dealership/leads?${params.toString()}`)
+  const items = extractList(payload, ['leads']).map(mapBdcLead).filter((lead) => lead?.id)
+  return {
+    items,
+    ...extractPagination(payload, { page, limit, itemCount: items.length }),
+  }
+}
+
+function uploadFile(path, file) {
+  const body = new FormData()
+  body.append('file', file)
+  return apiRequest(path, { method: 'POST', body })
+}
+
+export async function uploadBdcLeads(file) {
+  const payload = await uploadFile('/api/dealership/crm/leads/upload', file)
+  return textValue(payload?.message) || 'Leads uploaded.'
+}
+
+export async function uploadBdcInventory(file) {
+  const payload = await uploadFile('/api/dealership/crm/inventory/upload', file)
+  return textValue(payload?.message) || 'Inventory uploaded.'
+}
+
+export async function markBdcLeadSold(id) {
+  const payload = await apiRequest(
+    `/api/dealership/crm/leads/${encodeURIComponent(id)}/mark-sold`,
+    { method: 'POST' },
+  )
+  return textValue(payload?.message) || 'Lead marked sold.'
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+async function downloadSample(path, fallbackName) {
+  const token = getAuthToken()
+  return withLoading(async () => {
+    let response
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
+      })
+    } catch {
+      throw new ApiError(
+        `Cannot reach the server. Make sure the API is running at ${API_BASE_URL}.`,
+      )
+    }
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      throw new ApiError(
+        body?.message || body?.error || `Request failed (${response.status})`,
+        response.status,
+        body,
+      )
+    }
+
+    const disposition = response.headers.get('content-disposition') || ''
+    const match = String(disposition).match(/filename="?([^"]+)"?/i)
+    downloadBlob(await response.blob(), match?.[1] || fallbackName)
+  })
+}
+
+export function downloadBdcLeadsSample() {
+  return downloadSample('/api/dealership/crm/leads/sample', 'sample-leads.csv')
+}
+
+export function downloadBdcInventorySample() {
+  return downloadSample('/api/dealership/crm/inventory/sample', 'sample-inventory.csv')
+}
+
 const dealershipCrmService = {
   getDealershipCrm,
   syncDealershipCrm,
+  getBdcLeads,
+  uploadBdcLeads,
+  uploadBdcInventory,
+  markBdcLeadSold,
+  downloadBdcLeadsSample,
+  downloadBdcInventorySample,
 }
 
 export default dealershipCrmService

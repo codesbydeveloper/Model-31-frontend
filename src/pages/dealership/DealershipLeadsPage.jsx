@@ -15,6 +15,7 @@ import { formatNumber } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
 import { LEAD_STATUSES } from '../../data/leads'
 import dealershipLeadService from '../../services/api/dealershipLeadService'
+import { markBdcLeadSold } from '../../services/api/dealershipCrmService'
 import dealershipSalespersonService from '../../services/api/dealershipSalespersonService'
 import { statusGuardMessage } from '../../utils/statusGuard'
 
@@ -35,6 +36,7 @@ export default function DealershipLeadsPage() {
   const [people, setPeople] = useState([])
   const [selectedPerson, setSelectedPerson] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [sellingId, setSellingId] = useState('')
   const [guardMessage, setGuardMessage] = useState('')
 
   const load = useCallback(async () => {
@@ -125,17 +127,37 @@ export default function DealershipLeadsPage() {
     }
   }
 
+  const markSold = async (lead) => {
+    setSellingId(lead.id)
+    try {
+      const message = await markBdcLeadSold(lead.id)
+      showToast(message)
+      await load()
+    } catch (err) {
+      showToast(err.message || 'Unable to mark this lead sold.', 'error')
+    } finally {
+      setSellingId('')
+    }
+  }
+
   const columns = [
-      { key: 'id', label: 'Lead ID' },
-      { key: 'customerName', label: 'Customer' },
+      { key: 'customerName', label: 'Name' },
+      {
+        key: 'phone',
+        label: 'Phone',
+        render: (row) => row.phone || '—',
+      },
       {
         key: 'pipelineType',
         label: 'Pipeline',
         render: (row) => <PipelineBadge pipelineType={row.pipelineType} />,
       },
       { key: 'source', label: 'Source' },
-      { key: 'vehicle', label: 'Vehicle' },
-      { key: 'score', label: 'Score' },
+      {
+        key: 'tradeIn',
+        label: 'Trade-in',
+        render: (row) => row.tradeIn || '—',
+      },
       {
         key: 'status',
         label: 'Status',
@@ -149,8 +171,10 @@ export default function DealershipLeadsPage() {
       {
         key: 'actions',
         label: 'Actions',
+        className: 'text-center',
+        cellClassName: 'text-center',
         render: (row) => (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex items-center justify-center gap-2">
             <Link to={`/dealership/conversations?lead=${row.id}`}>
               <Button size="sm" variant="ghost">
                 View
@@ -170,6 +194,20 @@ export default function DealershipLeadsPage() {
             <Button size="sm" variant="ghost" onClick={() => openAssign(row)}>
               Assign
             </Button>
+            {String(row.status || '').toUpperCase() === 'CLOSED' ? (
+              <Button size="sm" variant="secondary" disabled>
+                Sold
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={sellingId === row.id}
+                onClick={() => markSold(row)}
+              >
+                {sellingId === row.id ? 'Saving...' : 'Mark Sold'}
+              </Button>
+            )}
           </div>
         ),
       },

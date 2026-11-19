@@ -208,6 +208,7 @@ export function mapLead(raw) {
     language: raw.language || 'English',
     source: raw.source || '',
     vehicle: raw.vehicle || '',
+    tradeIn: raw.tradeIn || raw.trade_in || '',
     budget: raw.budget || '',
     budgetValue: Number(raw.budgetValue) || parseBudgetValue(raw.budget),
     timeline: typeof raw.timeline === 'string' ? raw.timeline : '',

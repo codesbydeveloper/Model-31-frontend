@@ -66,6 +66,7 @@ function mapSmsAccount(raw) {
     managerMobile: textValue(
       source.managerMobile || source.manager_mobile || source.sales_alert_phones,
     ),
+    managerEmail: textValue(source.managerEmail || source.manager_email),
     timezone: textValue(source.timezone || source.dealership_timezone) || 'America/New_York',
     carrierProfileId: textValue(source.carrierProfileId || source.carrier_profile_id),
     hasAuthToken,
@@ -99,6 +100,9 @@ export async function updateDealershipSmsAccount(form) {
   }
   if (form.managerMobile != null) {
     body.managerMobile = textValue(form.managerMobile).replace(/\s/g, '')
+  }
+  if (form.managerEmail != null) {
+    body.managerEmail = textValue(form.managerEmail).toLowerCase()
   }
   const authToken = textValue(form.authToken)
   if (authToken) body.authToken = authToken

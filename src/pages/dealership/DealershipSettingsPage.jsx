@@ -53,6 +53,7 @@ const EMPTY_SMS = {
   authToken: '',
   phoneNumber: '',
   managerMobile: '',
+  managerEmail: '',
   timezone: 'America/New_York',
   carrierProfileId: '',
   hasAuthToken: false,
@@ -81,6 +82,12 @@ function validateSms(form) {
     errors.managerMobile = 'Enter the manager’s personal cell phone.'
   } else if (!/^\+[1-9]\d{7,14}$/.test(managerMobile)) {
     errors.managerMobile = 'Start with + and the country code, like +13059998888.'
+  }
+  const managerEmail = String(form.managerEmail || '').trim()
+  if (!managerEmail) {
+    errors.managerEmail = 'Enter the manager’s email.'
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(managerEmail)) {
+    errors.managerEmail = 'Enter a valid email, like manager@miamimotors.com.'
   }
   if (!form.timezone) errors.timezone = 'Choose the dealership timezone.'
   if (needsProfileId(form.providerType) && !form.carrierProfileId.trim()) {
@@ -175,6 +182,7 @@ export default function DealershipSettingsPage() {
         ...sms,
         phoneNumber: sms.phoneNumber.replace(/\s/g, ''),
         managerMobile: sms.managerMobile.replace(/\s/g, ''),
+        managerEmail: String(sms.managerEmail || '').trim(),
         carrierProfileId: needsProfileId(sms.providerType) ? sms.carrierProfileId : '',
       })
       setSms({
@@ -182,6 +190,7 @@ export default function DealershipSettingsPage() {
         providerType: saved.providerType || sms.providerType,
         timezone: saved.timezone || sms.timezone,
         managerMobile: saved.managerMobile || sms.managerMobile.replace(/\s/g, ''),
+        managerEmail: saved.managerEmail || String(sms.managerEmail || '').trim(),
         hasAuthToken: true,
         connected: true,
         authToken: '',
@@ -322,6 +331,21 @@ export default function DealershipSettingsPage() {
               />
               <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
                 Enter the BDC Manager or Sales Manager’s personal cell phone (do not enter a dealership landline).
+              </p>
+            </div>
+            <div>
+              <Input
+                label="Manager’s email"
+                name="managerEmail"
+                type="email"
+                value={sms.managerEmail}
+                error={smsErrors.managerEmail}
+                placeholder="manager@miamimotors.com"
+                autoComplete="off"
+                onChange={(event) => updateSms({ managerEmail: event.target.value })}
+              />
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                Deal sheets are emailed here when a buyer arrives or an appointment is booked.
               </p>
             </div>
             <Select

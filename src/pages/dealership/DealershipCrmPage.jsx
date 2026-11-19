@@ -1,142 +1,282 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Car, Download, FileSpreadsheet, Upload, Users, X } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
-import DataTable from '../../components/common/DataTable'
-import StatusBadge from '../../components/common/StatusBadge'
+import Modal from '../../components/common/Modal'
 import { useToast } from '../../hooks/useToast'
+import dealershipCrmService from '../../services/api/dealershipCrmService'
+import { getInventoryManagerInventoryPage } from '../../services/api/inventoryManagerService'
 
-const LEADS_KEY = 'model31_bdc_leads'
-const CARS_KEY = 'model31_bdc_inventory'
-
-function readStored(key) {
-  try {
-    const parsed = JSON.parse(sessionStorage.getItem(key) || '[]')
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
+function ColumnGroup({ label, fields }) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+        {label}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {fields.map((field) => (
+          <span
+            key={field}
+            className="rounded-md border border-[var(--border-default)] bg-white px-2.5 py-1 font-mono text-xs text-[var(--text-primary)]"
+          >
+            {field}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
 }
 
-function parseCsv(text) {
-  const rows = []
-  let row = []
-  let cell = ''
-  let quoted = false
-  const source = String(text || '').replace(/^\uFEFF/, '')
+function isCsvFile(file) {
+  if (!file) return false
+  const name = String(file.name || '').toLowerCase()
+  const type = String(file.type || '').toLowerCase()
+  return name.endsWith('.csv') || type.includes('csv')
+}
 
-  for (let index = 0; index < source.length; index += 1) {
-    const char = source[index]
-    if (quoted) {
-      if (char === '"') {
-        if (source[index + 1] === '"') {
-          cell += '"'
-          index += 1
-        } else {
-          quoted = false
-        }
-      } else {
-        cell += char
-      }
-    } else if (char === '"') {
-      quoted = true
-    } else if (char === ',') {
-      row.push(cell.trim())
-      cell = ''
-    } else if (char === '\n') {
-      row.push(cell.trim())
-      if (row.some(Boolean)) rows.push(row)
-      row = []
-      cell = ''
-    } else if (char !== '\r') {
-      cell += char
+function CsvUploadModal({ open, title, hint, uploading, onClose, onUpload }) {
+  const inputRef = useRef(null)
+  const [file, setFile] = useState(null)
+  const [dragOver, setDragOver] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (open) return undefined
+    const timer = window.setTimeout(() => {
+      setFile(null)
+      setDragOver(false)
+      setError('')
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [open])
+
+  const chooseFile = (next) => {
+    if (!next) return
+    if (!isCsvFile(next)) {
+      setFile(null)
+      setError('Choose a CSV file.')
+      return
     }
+    setError('')
+    setFile(next)
   }
 
-  if (cell || row.length) {
-    row.push(cell.trim())
-    if (row.some(Boolean)) rows.push(row)
-  }
-
-  return rows
+  return (
+    <Modal open={open} onClose={uploading ? undefined : onClose} title={title}>
+      <p className="text-sm text-[var(--text-secondary)]">{hint}</p>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => {
+          if (!uploading) inputRef.current?.click()
+        }}
+        onKeyDown={(event) => {
+          if (uploading) return
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            inputRef.current?.click()
+          }
+        }}
+        onDragOver={(event) => {
+          event.preventDefault()
+          if (!uploading) setDragOver(true)
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(event) => {
+          event.preventDefault()
+          setDragOver(false)
+          if (uploading) return
+          chooseFile(event.dataTransfer.files?.[0])
+        }}
+        className={`mt-4 flex w-full cursor-pointer flex-col items-center justify-center rounded-[var(--radius-lg)] border border-dashed px-4 py-8 text-center transition ${
+          dragOver
+            ? 'border-[var(--brand-accent)] bg-[var(--brand-accent-soft)]'
+            : 'border-[var(--border-strong)] bg-[var(--bg-app)]'
+        } ${uploading ? 'pointer-events-none opacity-60' : ''}`}
+      >
+        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[var(--brand-accent)]">
+          <FileSpreadsheet size={20} />
+        </span>
+        <span className="mt-3 text-sm font-medium text-[var(--text-primary)]">
+          Drop the CSV here
+        </span>
+        <span className="mt-1 text-xs text-[var(--text-muted)]">or choose it from this computer</span>
+        <Button
+          variant="secondary"
+          className="mt-4"
+          disabled={uploading}
+          onClick={(event) => {
+            event.stopPropagation()
+            inputRef.current?.click()
+          }}
+        >
+          Choose from computer
+        </Button>
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={(event) => {
+          chooseFile(event.target.files?.[0])
+          event.target.value = ''
+        }}
+      />
+      {file && (
+        <div className="mt-3 flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-white px-3 py-2">
+          <FileSpreadsheet size={16} className="shrink-0 text-[var(--brand-accent)]" />
+          <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text-primary)]">
+            {file.name}
+          </p>
+          <button
+            type="button"
+            aria-label="Remove file"
+            disabled={uploading}
+            onClick={() => {
+              setFile(null)
+              setError('')
+            }}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] disabled:opacity-50"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {error && (
+        <p className="mt-3 text-sm text-[var(--status-error)]">{error}</p>
+      )}
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="secondary" disabled={uploading} onClick={onClose}>
+          Cancel
+        </Button>
+        <Button disabled={!file || uploading} onClick={() => onUpload(file)}>
+          <Upload size={16} />
+          {uploading ? 'Uploading...' : 'Upload'}
+        </Button>
+      </div>
+    </Modal>
+  )
 }
 
-function headerKey(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[\s-]+/g, '_')
-}
-
-function rowsFromCsv(text, required) {
-  const table = parseCsv(text)
-  if (table.length < 2) {
-    throw new Error('The file needs a header row and at least one data row.')
-  }
-  const headers = table[0].map(headerKey)
-  const missing = required.filter((key) => !headers.includes(key))
-  if (missing.length) {
-    throw new Error(`Missing columns: ${missing.join(', ')}.`)
-  }
-  return table.slice(1).map((cells) => {
-    const record = {}
-    headers.forEach((key, index) => {
-      record[key] = cells[index] || ''
-    })
-    return record
-  })
-}
-
-function readFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(new Error('Unable to read that file.'))
-    reader.readAsText(file)
-  })
+function UploadCard({
+  icon: Icon,
+  title,
+  summary,
+  count,
+  countLabel,
+  required,
+  optional,
+  buttonLabel,
+  busy,
+  sampleBusy,
+  disabled,
+  onUpload,
+  onSample,
+}) {
+  return (
+    <Card padding={false} className="overflow-hidden">
+      <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]">
+            <Icon size={20} />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">{title}</h2>
+            <p className="mt-1 max-w-xl text-sm text-[var(--text-secondary)]">{summary}</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-5 sm:justify-end">
+          <div className="min-w-[4.5rem] text-right">
+            <p className="text-2xl font-semibold leading-none tracking-tight text-[var(--text-primary)]">
+              {count}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">{countLabel}</p>
+          </div>
+          <Button disabled={disabled} onClick={onUpload}>
+            <Upload size={16} />
+            {busy ? 'Uploading...' : buttonLabel}
+          </Button>
+        </div>
+      </div>
+      <div className="flex flex-col gap-4 border-t border-[var(--border-default)] bg-[var(--bg-app)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="min-w-0 flex-1">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ColumnGroup label="Required columns" fields={required} />
+            <ColumnGroup label="Optional columns" fields={optional} />
+          </div>
+          <p className="mt-4 text-xs text-[var(--text-muted)]">
+            CSV file. The header row must use these column names.
+          </p>
+        </div>
+        <Button variant="secondary" className="shrink-0 self-end sm:self-center" disabled={disabled} onClick={onSample}>
+          <Download size={16} />
+          {sampleBusy ? 'Downloading...' : 'Sample CSV'}
+        </Button>
+      </div>
+    </Card>
+  )
 }
 
 export default function DealershipCrmPage() {
   const { showToast } = useToast()
-  const leadsInput = useRef(null)
-  const inventoryInput = useRef(null)
-  const [leads, setLeads] = useState(() => readStored(LEADS_KEY))
-  const [cars, setCars] = useState(() => readStored(CARS_KEY))
+  const [total, setTotal] = useState(0)
+  const [cars, setCars] = useState(0)
   const [uploading, setUploading] = useState('')
+  const [uploadTarget, setUploadTarget] = useState('')
+
+  const loadCounts = useCallback(async () => {
+    try {
+      const [leadResult, inventoryResult] = await Promise.all([
+        dealershipCrmService.getBdcLeads({ page: 1, limit: 1 }),
+        getInventoryManagerInventoryPage({ page: 1, limit: 1 }),
+      ])
+      setTotal(leadResult.total)
+      setCars(inventoryResult.total)
+    } catch (err) {
+      showToast(err.message || 'Unable to load counts.', 'error')
+    }
+  }, [showToast])
 
   useEffect(() => {
-    sessionStorage.setItem(LEADS_KEY, JSON.stringify(leads))
-  }, [leads])
+    const timer = window.setTimeout(() => void loadCounts(), 0)
+    return () => window.clearTimeout(timer)
+  }, [loadCounts])
 
-  useEffect(() => {
-    sessionStorage.setItem(CARS_KEY, JSON.stringify(cars))
-  }, [cars])
+  const downloadLeadsSample = async () => {
+    setUploading('leads-sample')
+    try {
+      await dealershipCrmService.downloadBdcLeadsSample()
+      showToast('Sample CSV downloaded.')
+    } catch (err) {
+      showToast(err.message || 'Unable to download the sample.', 'error')
+    } finally {
+      setUploading('')
+    }
+  }
+
+  const downloadInventorySample = async () => {
+    setUploading('inventory-sample')
+    try {
+      await dealershipCrmService.downloadBdcInventorySample()
+      showToast('Sample CSV downloaded.')
+    } catch (err) {
+      showToast(err.message || 'Unable to download the sample.', 'error')
+    } finally {
+      setUploading('')
+    }
+  }
 
   const uploadLeads = async (file) => {
     if (!file) return
     setUploading('leads')
     try {
-      const records = rowsFromCsv(await readFile(file), ['name', 'phone', 'vehicle_interest'])
-      const next = []
-      const seen = new Set()
-      records.forEach((record, index) => {
-        const phone = record.phone.replace(/\s/g, '')
-        const name = record.name.trim()
-        if (!name || !phone || seen.has(phone)) return
-        seen.add(phone)
-        next.push({
-          id: `lead_${phone}`,
-          name,
-          phone,
-          vehicle: record.vehicle_interest.trim(),
-          status: 'Open',
-          order: index,
-        })
-      })
-      if (!next.length) throw new Error('No leads were found in that file.')
-      setLeads(next)
-      showToast(`${next.length} lead${next.length === 1 ? '' : 's'} uploaded.`)
+      const message = await dealershipCrmService.uploadBdcLeads(file)
+      showToast(message)
+      setUploadTarget('')
+      await loadCounts()
     } catch (err) {
       showToast(err.message || 'Unable to upload leads.', 'error')
     } finally {
@@ -148,24 +288,10 @@ export default function DealershipCrmPage() {
     if (!file) return
     setUploading('inventory')
     try {
-      const records = rowsFromCsv(await readFile(file), ['vin', 'year', 'make', 'model', 'price'])
-      const next = []
-      const seen = new Set()
-      records.forEach((record) => {
-        const vin = record.vin.trim().toUpperCase()
-        if (!vin || seen.has(vin)) return
-        seen.add(vin)
-        next.push({
-          vin,
-          year: record.year.trim(),
-          make: record.make.trim(),
-          model: record.model.trim(),
-          price: record.price.trim(),
-        })
-      })
-      if (!next.length) throw new Error('No cars were found in that file.')
-      setCars(next)
-      showToast(`${next.length} car${next.length === 1 ? '' : 's'} uploaded.`)
+      const message = await dealershipCrmService.uploadBdcInventory(file)
+      showToast(message)
+      setUploadTarget('')
+      await loadCounts()
     } catch (err) {
       showToast(err.message || 'Unable to upload inventory.', 'error')
     } finally {
@@ -173,11 +299,9 @@ export default function DealershipCrmPage() {
     }
   }
 
-  const markSold = (lead) => {
-    setLeads((current) =>
-      current.map((item) => (item.id === lead.id ? { ...item, status: 'Sold' } : item)),
-    )
-    showToast(`${lead.name} marked sold.`)
+  const closeUpload = () => {
+    if (uploading === 'leads' || uploading === 'inventory') return
+    setUploadTarget('')
   }
 
   return (
@@ -188,81 +312,54 @@ export default function DealershipCrmPage() {
         description="Upload the leads and inventory files from the dealership’s own system. No CRM connection."
       />
 
-      <Card className="mb-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-[var(--text-primary)]">Upload files</p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Leads need name, phone, and vehicle_interest. Inventory needs vin, year, make, model, and price.
-            </p>
-            <p className="mt-2 text-xs text-[var(--text-muted)]">
-              {leads.length} lead{leads.length === 1 ? '' : 's'} · {cars.length} car{cars.length === 1 ? '' : 's'} in stock
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button disabled={Boolean(uploading)} onClick={() => leadsInput.current?.click()}>
-              {uploading === 'leads' ? 'Uploading...' : 'Upload Leads'}
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={Boolean(uploading)}
-              onClick={() => inventoryInput.current?.click()}
-            >
-              {uploading === 'inventory' ? 'Uploading...' : 'Upload Inventory'}
-            </Button>
-          </div>
-        </div>
-        <input
-          ref={leadsInput}
-          type="file"
-          accept=".csv,text/csv"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0]
-            event.target.value = ''
-            void uploadLeads(file)
-          }}
+      <div className="grid gap-5">
+        <UploadCard
+          icon={Users}
+          title="Leads"
+          summary="Buyer list from the dealership’s own system. New leads show on the Leads page."
+          count={total}
+          countLabel={total === 1 ? 'lead uploaded' : 'leads uploaded'}
+          required={['name', 'phone', 'vehicle_interest']}
+          optional={['email', 'trade_in']}
+          buttonLabel="Upload Leads"
+          busy={uploading === 'leads'}
+          sampleBusy={uploading === 'leads-sample'}
+          disabled={Boolean(uploading)}
+          onUpload={() => setUploadTarget('leads')}
+          onSample={() => void downloadLeadsSample()}
         />
-        <input
-          ref={inventoryInput}
-          type="file"
-          accept=".csv,text/csv"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0]
-            event.target.value = ''
-            void uploadInventory(file)
-          }}
+        <UploadCard
+          icon={Car}
+          title="Inventory"
+          summary="Cars currently on the lot. Uploaded vehicles show on the Inventory page."
+          count={cars}
+          countLabel={cars === 1 ? 'car in stock' : 'cars in stock'}
+          required={['vin', 'year', 'make', 'model', 'price']}
+          optional={['trim', 'mileage', 'color', 'stock_number']}
+          buttonLabel="Upload Inventory"
+          busy={uploading === 'inventory'}
+          sampleBusy={uploading === 'inventory-sample'}
+          disabled={Boolean(uploading)}
+          onUpload={() => setUploadTarget('inventory')}
+          onSample={() => void downloadInventorySample()}
         />
-      </Card>
+      </div>
 
-      <DataTable
-        rows={leads}
-        rowKey="id"
-        pageSize={10}
-        showPagination={leads.length > 10}
-        emptyTitle="No leads yet"
-        emptyDescription="Upload a leads CSV to see customers here."
-        columns={[
-          { key: 'name', label: 'Name' },
-          { key: 'phone', label: 'Phone' },
-          { key: 'vehicle', label: 'Vehicle' },
-          {
-            key: 'status',
-            label: 'Status',
-            render: (row) => <StatusBadge status={row.status} />,
-          },
-          {
-            key: 'sold',
-            label: '',
-            render: (row) =>
-              row.status === 'Sold' ? null : (
-                <Button size="sm" variant="secondary" onClick={() => markSold(row)}>
-                  Mark Sold
-                </Button>
-              ),
-          },
-        ]}
+      <CsvUploadModal
+        open={uploadTarget === 'leads'}
+        title="Upload Leads"
+        hint="Drop the leads CSV here, or choose the file from this computer. It is sent when you click Upload."
+        uploading={uploading === 'leads'}
+        onClose={closeUpload}
+        onUpload={(file) => void uploadLeads(file)}
+      />
+      <CsvUploadModal
+        open={uploadTarget === 'inventory'}
+        title="Upload Inventory"
+        hint="Drop the inventory CSV here, or choose the file from this computer. It is sent when you click Upload."
+        uploading={uploading === 'inventory'}
+        onClose={closeUpload}
+        onUpload={(file) => void uploadInventory(file)}
       />
     </div>
   )
