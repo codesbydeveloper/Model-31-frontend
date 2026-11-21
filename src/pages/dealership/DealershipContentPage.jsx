@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
@@ -11,6 +12,15 @@ import PlatformBadge from '../../components/marketing/PlatformBadge'
 import ContentPreview from '../../components/marketing/ContentPreview'
 import { useToast } from '../../hooks/useToast'
 import dealershipContentService from '../../services/api/dealershipContentService'
+
+const PAGE_SIZE = 9
+
+function visiblePages(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1)
+  const start = Math.max(1, Math.min(current - 2, total - 4))
+  const end = Math.min(total, start + 4)
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index)
+}
 
 function DetailRow({ label, value }) {
   if (!value) return null
@@ -25,6 +35,8 @@ function DetailRow({ label, value }) {
 export default function DealershipContentPage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState([])
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [viewing, setViewing] = useState(null)
   const [viewLoading, setViewLoading] = useState(false)
@@ -32,14 +44,23 @@ export default function DealershipContentPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await dealershipContentService.getDealershipAiContent())
+      const result = await dealershipContentService.getDealershipAiContent({
+        page,
+        limit: PAGE_SIZE,
+      })
+      setRows(result.items)
+      setTotal(result.total)
+      if (result.items.length === 0 && page > 1) {
+        setPage((current) => Math.max(1, current - 1))
+      }
     } catch (err) {
       setRows([])
+      setTotal(0)
       showToast(err.message || 'Unable to load AI content.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [page, showToast])
 
   useEffect(() => {
     const t = window.setTimeout(() => void load(), 0)
@@ -67,6 +88,10 @@ export default function DealershipContentPage() {
     }
   }
 
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const to = Math.min((page - 1) * PAGE_SIZE + rows.length, total)
+
   return (
     <div className="mx-auto w-full max-w-7xl">
       <Breadcrumbs />
@@ -74,38 +99,97 @@ export default function DealershipContentPage() {
         title="AI Content"
         description="Review AI-generated marketing content for this dealership."
       />
-      <Card>
-        {loading ? (
+      {loading ? (
+        <Card>
           <div className="flex justify-center py-16">
             <LoadingSpinner size={28} />
           </div>
-        ) : rows.length === 0 ? (
+        </Card>
+      ) : rows.length === 0 ? (
+        <Card>
           <EmptyState
             title="No content yet"
             description="Marketing content for this dealership will appear here."
           />
-        ) : (
-          <ul className="space-y-3">
-            {rows.map((item) => (
-              <li
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {rows.map((item) => {
+            const excerpt = item.body && item.body !== item.title ? item.body : ''
+            return (
+              <Card
                 key={item.id}
-                className="flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border-default)] p-3 sm:flex-row sm:items-center sm:justify-between"
+                padding={false}
+                className="flex h-full flex-col overflow-hidden"
               >
-                <div>
-                  <p className="font-semibold">{item.title}</p>
-                  <div className="mt-1 flex flex-wrap gap-2">
+                <div className="flex flex-1 flex-col p-5">
+                  <div className="flex flex-wrap items-center gap-2">
                     <PlatformBadge platform={item.platform} />
                     <StatusBadge status={item.status} />
                   </div>
+                  <p className="mt-3 line-clamp-3 text-base font-semibold leading-snug text-[var(--text-primary)]">
+                    {item.title}
+                  </p>
+                  {excerpt ? (
+                    <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+                      {excerpt}
+                    </p>
+                  ) : null}
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => openItem(item)}>
-                  View
-                </Button>
-              </li>
+                <div className="mt-auto flex items-center justify-between gap-3 border-t border-[var(--border-default)] px-5 py-3">
+                  <p className="min-w-0 truncate text-xs text-[var(--text-muted)]">
+                    {item.createdAt || '—'}
+                  </p>
+                  <Button size="sm" variant="secondary" onClick={() => openItem(item)}>
+                    View
+                  </Button>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+      {!loading && total > PAGE_SIZE && (
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-[var(--text-secondary)]">
+            Showing {from}–{to} of {total}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage(page - 1)}
+              aria-label="Previous page"
+            >
+              <ChevronLeft size={16} />
+              Previous
+            </Button>
+            {visiblePages(page, totalPages).map((pageNumber) => (
+              <Button
+                key={pageNumber}
+                variant={pageNumber === page ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => setPage(pageNumber)}
+                aria-current={pageNumber === page ? 'page' : undefined}
+                aria-label={`Page ${pageNumber}`}
+              >
+                {pageNumber}
+              </Button>
             ))}
-          </ul>
-        )}
-      </Card>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage(page + 1)}
+              aria-label="Next page"
+            >
+              Next
+              <ChevronRight size={16} />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Modal
         open={Boolean(viewing)}

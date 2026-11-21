@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Car, Download, FileSpreadsheet, Upload, Users, X } from 'lucide-react'
+import { Car, Download, FileSpreadsheet, Receipt, Upload, Users, X } from 'lucide-react'
 import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
 import Modal from '../../components/common/Modal'
+import DataTable from '../../components/common/DataTable'
+import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { useToast } from '../../hooks/useToast'
 import dealershipCrmService from '../../services/api/dealershipCrmService'
-import { getInventoryManagerInventoryPage } from '../../services/api/inventoryManagerService'
+import {
+  formatMoney,
+  getInventoryManagerInventoryPage,
+} from '../../services/api/inventoryManagerService'
+
+const CHARGE_PAGE_SIZE = 10
 
 function ColumnGroup({ label, fields }) {
   return (
@@ -203,10 +210,14 @@ function UploadCard({
       </div>
       <div className="flex flex-col gap-4 border-t border-[var(--border-default)] bg-[var(--bg-app)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="min-w-0 flex-1">
-          <div className="grid gap-4 sm:grid-cols-2">
+          {optional?.length ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ColumnGroup label="Required columns" fields={required} />
+              <ColumnGroup label="Optional columns" fields={optional} />
+            </div>
+          ) : (
             <ColumnGroup label="Required columns" fields={required} />
-            <ColumnGroup label="Optional columns" fields={optional} />
-          </div>
+          )}
           <p className="mt-4 text-xs text-[var(--text-muted)]">
             CSV file. The header row must use these column names.
           </p>
@@ -224,6 +235,11 @@ export default function DealershipCrmPage() {
   const { showToast } = useToast()
   const [total, setTotal] = useState(0)
   const [cars, setCars] = useState(0)
+  const [charges, setCharges] = useState([])
+  const [chargeTotal, setChargeTotal] = useState(0)
+  const [chargePage, setChargePage] = useState(1)
+  const [chargesLoading, setChargesLoading] = useState(true)
+  const [chargesError, setChargesError] = useState('')
   const [uploading, setUploading] = useState('')
   const [uploadTarget, setUploadTarget] = useState('')
 
@@ -240,10 +256,35 @@ export default function DealershipCrmPage() {
     }
   }, [showToast])
 
+  const loadCharges = useCallback(async () => {
+    setChargesLoading(true)
+    try {
+      const result = await dealershipCrmService.getBdcSoldCharges({
+        page: chargePage,
+        limit: CHARGE_PAGE_SIZE,
+      })
+      setCharges(result.items)
+      setChargeTotal(result.total)
+      setChargesError('')
+      if (result.items.length === 0 && chargePage > 1) {
+        setChargePage((current) => Math.max(1, current - 1))
+      }
+    } catch (err) {
+      setCharges([])
+      setChargeTotal(0)
+      setChargesError(err.message || 'Unable to load the $31 charges.')
+    } finally {
+      setChargesLoading(false)
+    }
+  }, [chargePage])
+
   useEffect(() => {
-    const timer = window.setTimeout(() => void loadCounts(), 0)
+    const timer = window.setTimeout(() => {
+      void loadCounts()
+      void loadCharges()
+    }, 0)
     return () => window.clearTimeout(timer)
-  }, [loadCounts])
+  }, [loadCounts, loadCharges])
 
   const downloadLeadsSample = async () => {
     setUploading('leads-sample')
@@ -299,17 +340,45 @@ export default function DealershipCrmPage() {
     }
   }
 
+  const downloadSoldSample = async () => {
+    setUploading('sold-sample')
+    try {
+      await dealershipCrmService.downloadBdcSoldSample()
+      showToast('Sample CSV downloaded.')
+    } catch (err) {
+      showToast(err.message || 'Unable to download the sample.', 'error')
+    } finally {
+      setUploading('')
+    }
+  }
+
+  const uploadSold = async (file) => {
+    if (!file) return
+    setUploading('sold')
+    try {
+      const message = await dealershipCrmService.uploadBdcSold(file)
+      showToast(message)
+      setUploadTarget('')
+      if (chargePage !== 1) setChargePage(1)
+      else await loadCharges()
+    } catch (err) {
+      showToast(err.message || 'Unable to upload the sold file.', 'error')
+    } finally {
+      setUploading('')
+    }
+  }
+
   const closeUpload = () => {
-    if (uploading === 'leads' || uploading === 'inventory') return
+    if (uploading === 'leads' || uploading === 'inventory' || uploading === 'sold') return
     setUploadTarget('')
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full max-w-6xl">
       <Breadcrumbs />
       <PageHeader
         title="BDC Lead Manager"
-        description="Upload the leads and inventory files from the dealership’s own system. No CRM connection."
+        description="Upload the leads, inventory, and sold files from the dealership’s own system. No CRM connection."
       />
 
       <div className="grid gap-5">
@@ -343,7 +412,62 @@ export default function DealershipCrmPage() {
           onUpload={() => setUploadTarget('inventory')}
           onSample={() => void downloadInventorySample()}
         />
+        <UploadCard
+          icon={Receipt}
+          title="Sold file"
+          summary="Cars sold that day. A buyer phone that matches a lead the AI already talked to adds $31."
+          count={chargeTotal}
+          countLabel={chargeTotal === 1 ? '$31 charge' : '$31 charges'}
+          required={['buyer_name', 'buyer_phone', 'vin', 'sold_date']}
+          buttonLabel="Upload Sold File"
+          busy={uploading === 'sold'}
+          sampleBusy={uploading === 'sold-sample'}
+          disabled={Boolean(uploading)}
+          onUpload={() => setUploadTarget('sold')}
+          onSample={() => void downloadSoldSample()}
+        />
       </div>
+
+      <Card className="mt-5">
+        <h2 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">$31 charges</h2>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
+          Matches from the sold file. This list is view only.
+        </p>
+        <div className="mt-4">
+          {chargesLoading ? (
+            <div className="flex min-h-[20vh] items-center justify-center">
+              <LoadingSpinner size={32} />
+            </div>
+          ) : chargesError ? (
+            <p className="text-sm text-[var(--status-error)]">{chargesError}</p>
+          ) : (
+            <DataTable
+              rows={charges}
+              rowKey="id"
+              page={chargePage}
+              pageSize={CHARGE_PAGE_SIZE}
+              totalItems={chargeTotal}
+              onPageChange={setChargePage}
+              showPagination={chargeTotal > CHARGE_PAGE_SIZE}
+              emptyTitle="No $31 charges yet."
+              emptyDescription="Matched sold cars will appear here after the sold file is uploaded."
+              columns={[
+                { key: 'buyerName', label: 'Buyer', className: 'text-center', cellClassName: 'text-center' },
+                { key: 'buyerPhone', label: 'Phone', className: 'text-center', cellClassName: 'text-center' },
+                { key: 'vin', label: 'VIN', className: 'text-center', cellClassName: 'text-center' },
+                { key: 'soldDate', label: 'Sold date', className: 'text-center', cellClassName: 'text-center' },
+                {
+                  key: 'amount',
+                  label: 'Amount',
+                  className: 'text-center',
+                  cellClassName: 'text-center',
+                  render: (row) => formatMoney(row.amount),
+                },
+              ]}
+            />
+          )}
+        </div>
+      </Card>
 
       <CsvUploadModal
         open={uploadTarget === 'leads'}
@@ -360,6 +484,14 @@ export default function DealershipCrmPage() {
         uploading={uploading === 'inventory'}
         onClose={closeUpload}
         onUpload={(file) => void uploadInventory(file)}
+      />
+      <CsvUploadModal
+        open={uploadTarget === 'sold'}
+        title="Upload Sold File"
+        hint="Drop the sold CSV here, or choose the file from this computer. It is sent when you click Upload."
+        uploading={uploading === 'sold'}
+        onClose={closeUpload}
+        onUpload={(file) => void uploadSold(file)}
       />
     </div>
   )

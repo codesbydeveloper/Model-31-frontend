@@ -27,11 +27,14 @@ function mapVehicle(raw, index = 0) {
   const model = textValue(raw.model)
   return {
     id: String(id),
-    stockNumber: textValue(raw.stockNumber || raw.stock, String(id)),
+    stockNumber: textValue(raw.stockNumber || raw.stock_number || raw.stock),
     vin: textValue(raw.vin),
     year,
     make,
     model,
+    trim: textValue(raw.trim),
+    mileage: raw.mileage == null || raw.mileage === '' ? '' : numberValue(raw.mileage),
+    color: textValue(raw.color),
     vehicle: textValue(raw.vehicle) || [year, make, model].filter(Boolean).join(' '),
     price: numberValue(raw.price),
     minPrice: raw.minPrice == null || raw.minPrice === '' ? null : numberValue(raw.minPrice),
@@ -79,40 +82,33 @@ export async function getInventoryManagerInventoryPage({ page = 1, limit = 10 } 
   }
 }
 
+function inventoryBody(form) {
+  const mileage = String(form.mileage ?? '').trim()
+  return {
+    vin: String(form.vin || '').trim(),
+    year: form.year === '' || form.year == null ? undefined : Number(form.year),
+    make: String(form.make || '').trim(),
+    model: String(form.model || '').trim(),
+    price: form.price === '' || form.price == null ? undefined : Number(form.price),
+    trim: String(form.trim || '').trim(),
+    mileage: mileage === '' ? null : Number(mileage.replace(/[^0-9.]/g, '')),
+    color: String(form.color || '').trim(),
+    stockNumber: String(form.stockNumber || '').trim(),
+  }
+}
+
 export async function createInventoryManagerVehicle(form) {
-  const images = (form.images || []).map((item) => String(item || '').trim()).filter(Boolean)
   const payload = await apiRequest('/api/inventory-manager/inventory', {
     method: 'POST',
-    body: {
-      vehicle: String(form.vehicle || '').trim(),
-      year: form.year ? Number(form.year) : undefined,
-      make: String(form.make || '').trim(),
-      model: String(form.model || '').trim(),
-      vin: String(form.vin || '').trim(),
-      price: form.price === '' || form.price == null ? undefined : Number(form.price),
-      minPrice: form.minPrice === '' || form.minPrice == null ? null : Number(form.minPrice),
-      images,
-    },
+    body: inventoryBody(form),
   })
   return mapVehicle(extractItem(payload, ['vehicle', 'item']))
 }
 
 export async function updateInventoryManagerVehicle(id, form) {
-  const body = new FormData()
-  const vehicle = String(form.vehicle || '').trim()
-  if (vehicle) body.append('vehicle', vehicle)
-  if (form.year) body.append('year', String(form.year))
-  body.append('make', String(form.make || '').trim())
-  body.append('model', String(form.model || '').trim())
-  body.append('vin', String(form.vin || '').trim())
-  if (form.price !== '' && form.price != null) body.append('price', String(form.price))
-  body.append('minPrice', form.minPrice === '' || form.minPrice == null ? '' : String(form.minPrice))
-  for (const file of form.images || []) {
-    if (file) body.append('images', file)
-  }
   const payload = await apiRequest(
     `/api/inventory-manager/inventory/${encodeURIComponent(id)}`,
-    { method: 'PATCH', body },
+    { method: 'PATCH', body: inventoryBody(form) },
   )
   return mapVehicle(extractItem(payload, ['vehicle', 'item']))
 }

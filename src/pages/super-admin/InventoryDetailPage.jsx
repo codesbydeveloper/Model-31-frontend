@@ -5,7 +5,6 @@ import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
-import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { formatNumber } from '../../utils/table'
 import { useToast } from '../../hooks/useToast'
@@ -64,114 +63,31 @@ export default function InventoryDetailPage() {
           </Button>
         </Link>
       </div>
-      <PageHeader
-        title={item.vehicle}
-        description={`${item.vin} · ${item.dealership}`}
-        actions={<StatusBadge status={item.status} />}
-      />
-
-      <Card className="mb-4">
-        <h2 className="mb-3 text-base font-semibold">Images</h2>
-        {(item.images || []).length === 0 ? (
-          <p className="text-sm text-[var(--text-secondary)]">No images yet.</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {item.images.map((image) => (
-              <img
-                key={image.id}
-                src={image.url}
-                alt=""
-                className="h-28 w-full rounded-[var(--radius-md)] object-cover"
-              />
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <h2 className="mb-3 text-base font-semibold">Vehicle Details</h2>
-          <dl className="space-y-2 text-sm">
-            <Row label="VIN" value={item.vin} />
-            <Row label="Year" value={item.year} />
-            <Row label="Make" value={item.make} />
-            <Row label="Model" value={item.model} />
-            <Row label="Trim" value={item.trim} />
-            <Row label="Price" value={`$${formatNumber(item.price)}`} />
-            <Row
-              label="Min price"
-              value={item.minPrice == null ? '—' : `$${formatNumber(item.minPrice)}`}
-            />
-            <Row label="Mileage" value={`${formatNumber(item.mileage)} mi`} />
-            <Row label="Color" value={item.color} />
-            <Row label="Dealership" value={item.dealership} />
-            <Row label="Availability" value={item.status} />
-            <Row label="Days in Inventory" value={item.daysInInventory} />
-          </dl>
-        </Card>
-
-        <Card>
-          <h2 className="mb-3 text-base font-semibold">Price History</h2>
-          <div className="mb-4 rounded-[var(--radius-md)] bg-[var(--bg-muted)] p-4 text-center">
-            <p className="text-sm text-[var(--text-secondary)]">Original → Current</p>
-            <p className="mt-2 text-xl font-semibold">
-              ${formatNumber(item.originalPrice)} → ${formatNumber(item.price)}
-            </p>
-            {item.priceChangeDate && (
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                Changed {item.priceChangeDate}
-              </p>
-            )}
-          </div>
-          {(item.priceHistory || []).length === 0 ? (
-            <p className="text-sm text-[var(--text-secondary)]">No price history yet.</p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {item.priceHistory.map((p) => (
-                <li
-                  key={`${p.date}-${p.label}`}
-                  className="flex justify-between rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-2"
-                >
-                  <span>
-                    {p.label} · {p.date}
-                  </span>
-                  <span className="font-medium">${formatNumber(p.price)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
-
-      <Card className="mt-4">
-        <h2 className="mb-3 text-base font-semibold">Inventory History</h2>
-        {(item.inventoryHistory || []).length === 0 ? (
-          <p className="text-sm text-[var(--text-secondary)]">No inventory history yet.</p>
-        ) : (
-          <ul className="space-y-2">
-            {item.inventoryHistory.map((h, idx) => (
-              <li
-                key={h.id || `${h.date}-${idx}`}
-                className="rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-2 text-sm"
-              >
-                <p className="font-medium">{h.event}</p>
-                <p className="text-xs text-[var(--text-secondary)]">
-                  {h.actor} · {h.date}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
+      <PageHeader title={item.vehicle || 'Vehicle'} />
+      <Card>
+        <h2 className="mb-4 text-base font-semibold">Vehicle</h2>
+        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="VIN" value={item.vin} />
+          <Field label="Year" value={item.year} />
+          <Field label="Make" value={item.make} />
+          <Field label="Model" value={item.model} />
+          <Field label="Price" value={`$${formatNumber(item.price)}`} />
+          <Field label="Trim" value={item.trim} />
+          <Field label="Mileage" value={item.mileage == null || item.mileage === '' || item.mileage === '—' ? '' : formatNumber(item.mileage)} />
+          <Field label="Color" value={item.color} />
+          <Field label="Stock Number" value={item.stockNumber} />
+        </dl>
       </Card>
     </div>
   )
 }
 
-function Row({ label, value }) {
+function Field({ label, value }) {
+  const text = value == null || value === '' || value === '—' ? '—' : String(value)
   return (
-    <div className="flex justify-between gap-3">
-      <dt className="text-[var(--text-secondary)]">{label}</dt>
-      <dd className="text-right font-medium">{value}</dd>
+    <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-app)] px-4 py-3">
+      <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">{label}</dt>
+      <dd className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{text}</dd>
     </div>
   )
 }

@@ -171,11 +171,11 @@ export default function DealershipLeadsPage() {
       {
         key: 'actions',
         label: 'Actions',
-        className: 'text-center',
-        cellClassName: 'text-center',
+        className: 'whitespace-nowrap text-right',
+        cellClassName: 'whitespace-nowrap text-right',
         render: (row) => (
-          <div className="flex items-center justify-center gap-2">
-            <Link to={`/dealership/conversations?lead=${row.id}`}>
+          <div className="inline-flex items-center justify-end gap-1">
+            <Link to={`/dealership/conversations?lead=${row.id}`} className="inline-flex">
               <Button size="sm" variant="ghost">
                 View
               </Button>
@@ -195,13 +195,14 @@ export default function DealershipLeadsPage() {
               Assign
             </Button>
             {String(row.status || '').toUpperCase() === 'CLOSED' ? (
-              <Button size="sm" variant="secondary" disabled>
+              <Button size="sm" variant="secondary" className="ml-1 min-w-[6.75rem]" disabled>
                 Sold
               </Button>
             ) : (
               <Button
                 size="sm"
                 variant="secondary"
+                className="ml-1 min-w-[6.75rem]"
                 disabled={sellingId === row.id}
                 onClick={() => markSold(row)}
               >

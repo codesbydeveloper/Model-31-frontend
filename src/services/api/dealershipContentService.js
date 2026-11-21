@@ -1,5 +1,5 @@
 import { apiRequest } from './http'
-import { extractList, extractItem, textValue, formatStamp } from './payload'
+import { extractList, extractItem, extractPagination, textValue, formatStamp } from './payload'
 
 function pickRecord(payload) {
   if (!payload || typeof payload !== 'object') return null
@@ -83,9 +83,19 @@ function mapContent(raw) {
   }
 }
 
-export async function getDealershipAiContent() {
-  const payload = await apiRequest('/api/dealership/ai-content')
-  return extractList(payload, ['content', 'items', 'rows']).map(mapContent).filter(Boolean)
+export async function getDealershipAiContent({ page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  })
+  const payload = await apiRequest(`/api/dealership/ai-content?${params.toString()}`)
+  const items = extractList(payload, ['content', 'items', 'rows'])
+    .map(mapContent)
+    .filter(Boolean)
+  return {
+    items,
+    ...extractPagination(payload, { page, limit, itemCount: items.length }),
+  }
 }
 
 export async function getDealershipAiContentById(id) {

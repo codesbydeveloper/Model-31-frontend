@@ -5,12 +5,15 @@ import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
+import SearchInput from '../../components/common/SearchInput'
 import Input from '../../components/common/Input'
 import Select from '../../components/common/Select'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { useToast } from '../../hooks/useToast'
 import dealershipConversationService from '../../services/api/dealershipConversationService'
+
+const SEARCH_DEBOUNCE_MS = 400
 
 export default function DealershipConversationsPage() {
   const { showToast } = useToast()
@@ -22,20 +25,26 @@ export default function DealershipConversationsPage() {
   const [sending, setSending] = useState(false)
   const [draft, setDraft] = useState('')
   const [senderType, setSenderType] = useState('AI')
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   const loadThreads = useCallback(async () => {
-    setLoading(true)
     try {
-      const rows = await dealershipConversationService.getDealershipConversations()
+      const rows = await dealershipConversationService.getDealershipConversations(debouncedSearch)
       setThreads(rows)
-      setSelectedId((current) => current || params.get('lead') || rows[0]?.id || '')
+      setSelectedId((current) => {
+        if (current && rows.some((row) => row.id === current)) return current
+        const fromUrl = params.get('lead')
+        if (!debouncedSearch && fromUrl && rows.some((row) => row.id === fromUrl)) return fromUrl
+        return rows[0]?.id || ''
+      })
     } catch (err) {
       setThreads([])
       showToast(err.message || 'Unable to load conversations.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [params, showToast])
+  }, [debouncedSearch, params, showToast])
 
   const loadMessages = useCallback(
     async (leadId) => {
@@ -52,6 +61,11 @@ export default function DealershipConversationsPage() {
     },
     [showToast],
   )
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     const t = window.setTimeout(() => void loadThreads(), 0)
@@ -82,26 +96,34 @@ export default function DealershipConversationsPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <LoadingSpinner label="Loading conversations…" />
-      </div>
-    )
-  }
-
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4">
       <Breadcrumbs />
       <PageHeader
         title="Conversations"
         description="Monitor AI and agent conversations for dealership leads."
+        actions={
+          <SearchInput
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search conversations"
+            className="w-full sm:w-72"
+          />
+        }
       />
-      {threads.length === 0 ? (
+      {loading ? (
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <LoadingSpinner label="Loading conversations…" />
+        </div>
+      ) : threads.length === 0 ? (
         <EmptyState
           icon={MessageSquare}
           title="No conversations"
-          description="Lead conversations will appear here."
+          description={
+            debouncedSearch
+              ? 'No conversations match that search.'
+              : 'Lead conversations will appear here.'
+          }
         />
       ) : (
         <div className="grid gap-4 lg:grid-cols-[280px_1fr]">

@@ -28,15 +28,23 @@ function mapMessage(raw, index = 0) {
   }
 }
 
-export async function getDealershipConversations() {
-  const payload = await apiRequest('/api/dealership/conversations')
+function searchQuery(search) {
+  const value = String(search || '').trim()
+  if (!value) return ''
+  return `?${new URLSearchParams({ search: value }).toString()}`
+}
+
+export async function getDealershipConversations(search = '') {
+  const payload = await apiRequest(`/api/dealership/conversations${searchQuery(search)}`)
   return extractList(payload, ['conversations', 'leads'])
     .map(mapConversation)
     .filter(Boolean)
 }
 
-export async function getDealershipConversation(leadId) {
-  const payload = await apiRequest(`/api/dealership/conversations/${leadId}`)
+export async function getDealershipConversation(leadId, search = '') {
+  const payload = await apiRequest(
+    `/api/dealership/conversations/${encodeURIComponent(leadId)}${searchQuery(search)}`,
+  )
   const item = extractItem(payload, ['conversation', 'thread'])
   const messages = Array.isArray(item)
     ? item

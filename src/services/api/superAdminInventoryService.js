@@ -61,6 +61,7 @@ export function mapInventoryVehicle(raw, index = 0) {
     make: make || '—',
     model: model || '—',
     trim: textValue(raw.trim, '—'),
+    stockNumber: textValue(raw.stockNumber || raw.stock_number || raw.stock, ''),
     price: numberValue(raw.price, raw.currentPrice),
     minPrice:
       raw.minPrice == null || raw.minPrice === '' ? null : numberValue(raw.minPrice),
@@ -172,52 +173,33 @@ export async function getInventory({
   }
 }
 
-export async function createInventoryVehicle(form) {
-  const year = form.year ? Number(form.year) : undefined
-  const make = String(form.make || '').trim()
-  const model = String(form.model || '').trim()
-  const body = new FormData()
-  if (year) body.append('year', String(year))
-  body.append('make', make)
-  body.append('model', model)
-  body.append('trim', String(form.trim || '').trim())
-  body.append('vin', String(form.vin || '').trim())
-  body.append('price', form.price === '' || form.price == null ? '0' : String(form.price))
-  body.append('minPrice', form.minPrice === '' || form.minPrice == null ? '' : String(form.minPrice))
-  body.append('status', form.status || 'AVAILABLE')
-  body.append('dealership', String(form.dealership || '').trim())
-  body.append('vehicle', [year, make, model].filter(Boolean).join(' '))
-  for (const file of form.images || []) {
-    if (file) body.append('images', file)
+function inventoryBody(form) {
+  const mileage = String(form.mileage ?? '').trim()
+  return {
+    vin: String(form.vin || '').trim(),
+    year: form.year === '' || form.year == null ? undefined : Number(form.year),
+    make: String(form.make || '').trim(),
+    model: String(form.model || '').trim(),
+    price: form.price === '' || form.price == null ? undefined : Number(form.price),
+    trim: String(form.trim || '').trim(),
+    mileage: mileage === '' ? null : Number(mileage.replace(/[^0-9.]/g, '')),
+    color: String(form.color || '').trim(),
+    stockNumber: String(form.stockNumber || '').trim(),
   }
+}
+
+export async function createInventoryVehicle(form) {
   const payload = await apiRequest('/api/super-admin/inventory', {
     method: 'POST',
-    body,
+    body: inventoryBody(form),
   })
   return mapInventoryVehicle(extractItem(payload, ['vehicle', 'item']) || payload.vehicle)
 }
 
 export async function updateInventoryVehicle(id, form) {
-  const year = form.year ? Number(form.year) : undefined
-  const make = String(form.make || '').trim()
-  const model = String(form.model || '').trim()
-  const body = new FormData()
-  if (year) body.append('year', String(year))
-  body.append('make', make)
-  body.append('model', model)
-  body.append('trim', String(form.trim || '').trim())
-  body.append('vin', String(form.vin || '').trim())
-  body.append('price', form.price === '' || form.price == null ? '0' : String(form.price))
-  body.append('minPrice', form.minPrice === '' || form.minPrice == null ? '' : String(form.minPrice))
-  body.append('status', form.status || 'AVAILABLE')
-  body.append('dealership', String(form.dealership || '').trim())
-  body.append('vehicle', [year, make, model].filter(Boolean).join(' '))
-  for (const file of form.images || []) {
-    if (file) body.append('images', file)
-  }
   const payload = await apiRequest(`/api/super-admin/inventory/${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    body,
+    body: inventoryBody(form),
   })
   return mapInventoryVehicle(extractItem(payload, ['vehicle', 'item']) || payload.vehicle)
 }

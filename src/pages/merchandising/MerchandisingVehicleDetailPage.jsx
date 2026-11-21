@@ -5,7 +5,6 @@ import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
-import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { useToast } from '../../hooks/useToast'
 import {
@@ -13,11 +12,12 @@ import {
   getInventoryManagerVehicle,
 } from '../../services/api/inventoryManagerService'
 
-function Row({ label, value }) {
+function Field({ label, value }) {
+  const text = value == null || value === '' ? '—' : String(value)
   return (
-    <div className="flex items-start justify-between gap-3">
-      <dt className="text-[var(--text-secondary)]">{label}</dt>
-      <dd className="text-right font-medium">{value || '—'}</dd>
+    <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-app)] px-4 py-3">
+      <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">{label}</dt>
+      <dd className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{text}</dd>
     </div>
   )
 }
@@ -75,41 +75,19 @@ export default function MerchandisingVehicleDetailPage() {
           </Button>
         </Link>
       </div>
-      <PageHeader
-        title={item.vehicle}
-        description={`${item.stockNumber} · ${item.dealership}`}
-        actions={<StatusBadge status={item.merchStatus} />}
-      />
-      <Card className="mb-4">
-        <h2 className="mb-3 text-base font-semibold">Images</h2>
-        {(item.images || []).length === 0 ? (
-          <p className="text-sm text-[var(--text-secondary)]">No images yet.</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {item.images.map((image) => (
-              <img
-                key={image.id}
-                src={image.url}
-                alt=""
-                className="h-28 w-full rounded-[var(--radius-md)] object-cover"
-              />
-            ))}
-          </div>
-        )}
-      </Card>
+      <PageHeader title={item.vehicle || 'Vehicle'} />
       <Card>
-        <h2 className="mb-3 text-base font-semibold">Listing details</h2>
-        <dl className="space-y-2 text-sm">
-          <Row label="Stock #" value={item.stockNumber} />
-          <Row label="VIN" value={item.vin} />
-          <Row label="Year" value={item.year} />
-          <Row label="Make" value={item.make} />
-          <Row label="Model" value={item.model} />
-          <Row label="Price" value={formatMoney(item.price)} />
-          <Row label="Min price" value={item.minPrice == null ? '—' : formatMoney(item.minPrice)} />
-          <Row label="Days in stock" value={item.daysInStock} />
-          <Row label="Photos" value={item.photoCount} />
-          <Row label="Merch status" value={item.merchStatus} />
+        <h2 className="mb-4 text-base font-semibold">Vehicle</h2>
+        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="VIN" value={item.vin} />
+          <Field label="Year" value={item.year} />
+          <Field label="Make" value={item.make} />
+          <Field label="Model" value={item.model} />
+          <Field label="Price" value={formatMoney(item.price)} />
+          <Field label="Trim" value={item.trim} />
+          <Field label="Mileage" value={item.mileage === '' || item.mileage == null ? '' : Number(item.mileage).toLocaleString('en-US')} />
+          <Field label="Color" value={item.color} />
+          <Field label="Stock Number" value={item.stockNumber} />
         </dl>
       </Card>
     </div>

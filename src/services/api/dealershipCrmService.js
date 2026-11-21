@@ -136,6 +136,55 @@ export function downloadBdcInventorySample() {
   return downloadSample('/api/dealership/crm/inventory/sample', 'sample-inventory.csv')
 }
 
+function formatSoldDate(value) {
+  const text = textValue(value)
+  if (!text) return '—'
+  const date = new Date(text.length === 10 ? `${text}T00:00:00` : text)
+  if (Number.isNaN(date.getTime())) return text
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function mapSoldCharge(raw, index) {
+  if (!raw || typeof raw !== 'object') return null
+  const amount = Number(raw.amount ?? raw.charge ?? 31)
+  return {
+    id: String(raw.id || raw._id || `sold_${index}`),
+    buyerName: textValue(raw.buyerName || raw.buyer_name || raw.customerName || raw.name) || '—',
+    buyerPhone: textValue(raw.buyerPhone || raw.buyer_phone || raw.phone) || '—',
+    vin: textValue(raw.vin) || '—',
+    soldDate: formatSoldDate(raw.soldDate || raw.sold_date || raw.saleDate || raw.sale_date),
+    amount: Number.isFinite(amount) ? amount : 31,
+  }
+}
+
+export async function getBdcSoldCharges({ page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  })
+  const payload = await apiRequest(`/api/dealership/crm/sold?${params.toString()}`)
+  const items = extractList(payload, ['charges', 'sold', 'sales'])
+    .map(mapSoldCharge)
+    .filter((row) => row?.id)
+  return {
+    items,
+    ...extractPagination(payload, { page, limit, itemCount: items.length }),
+  }
+}
+
+export async function uploadBdcSold(file) {
+  const payload = await uploadFile('/api/dealership/crm/sold/upload', file)
+  return textValue(payload?.message) || 'Sold file uploaded.'
+}
+
+export function downloadBdcSoldSample() {
+  return downloadSample('/api/dealership/crm/sold/sample', 'sample-sold.csv')
+}
+
 const dealershipCrmService = {
   getDealershipCrm,
   syncDealershipCrm,
@@ -145,6 +194,9 @@ const dealershipCrmService = {
   markBdcLeadSold,
   downloadBdcLeadsSample,
   downloadBdcInventorySample,
+  getBdcSoldCharges,
+  uploadBdcSold,
+  downloadBdcSoldSample,
 }
 
 export default dealershipCrmService

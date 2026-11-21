@@ -3,7 +3,6 @@ import PageHeader from '../../components/layout/PageHeader'
 import Breadcrumbs from '../../components/layout/Breadcrumbs'
 import Card from '../../components/common/Card'
 import DataTable from '../../components/common/DataTable'
-import StatusBadge from '../../components/common/StatusBadge'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { useToast } from '../../hooks/useToast'
 import {
@@ -57,7 +56,10 @@ export default function DealershipInventoryPage() {
           </div>
         ) : (
           <DataTable
-            rows={cars}
+            rows={cars.map((car, index) => ({
+              ...car,
+              srNo: (page - 1) * PAGE_SIZE + index + 1,
+            }))}
             rowKey="id"
             page={page}
             pageSize={PAGE_SIZE}
@@ -67,25 +69,26 @@ export default function DealershipInventoryPage() {
             emptyTitle="No vehicles."
             emptyDescription="Cars added for this dealership will appear here."
             columns={[
-              { key: 'stockNumber', label: 'Stock #' },
-              { key: 'vehicle', label: 'Vehicle' },
-              { key: 'vin', label: 'VIN' },
+              {
+                key: 'srNo',
+                label: 'Sr No',
+                className: 'text-center',
+                cellClassName: 'text-center',
+              },
+              {
+                key: 'vin',
+                label: 'VIN',
+                className: 'text-center',
+                cellClassName: 'text-center',
+                render: (row) => row.vin || '—',
+              },
+              { key: 'year', label: 'Year', render: (row) => row.year || '—' },
+              { key: 'make', label: 'Make', render: (row) => row.make || '—' },
+              { key: 'model', label: 'Model', render: (row) => row.model || '—' },
               {
                 key: 'price',
                 label: 'Price',
                 render: (row) => formatMoney(row.price),
-              },
-              {
-                key: 'minPrice',
-                label: 'Min Price',
-                render: (row) => (row.minPrice == null ? '—' : formatMoney(row.minPrice)),
-              },
-              { key: 'daysInStock', label: 'Days' },
-              { key: 'photoCount', label: 'Photos' },
-              {
-                key: 'merchStatus',
-                label: 'Status',
-                render: (row) => <StatusBadge status={row.merchStatus} />,
               },
             ]}
           />
